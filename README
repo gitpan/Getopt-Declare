@@ -1,5 +1,5 @@
 ==============================================================================
-                  Release of version 1.07 of Getopt::Declare
+                  Release of version 1.08 of Getopt::Declare
 ==============================================================================
 
 DESCRIPTION
@@ -82,25 +82,24 @@ Other features of the Getopt::Declare package include:
         * The ability to parse files (especially configuration files)
           instead of the command-line.
 
+Note: requires the Text::Balanced module
+
 
 ==============================================================================
 
-CHANGES IN VERSION 1.07
+CHANGES IN VERSION 1.08
 
 
-	- Changed behaviour of [ditto] when ditto'ing multiline
-	  descriptions (now prints: "Same as <prevflag>" instead)
+	- Now only generates .CODE file if $::Declare_debug is true
 
-	- Fixed bug in handling of version flag (which made every
-	  argument beginning with -v... into a version flag)
+	- Added Text::Balanced as PREREQ to Makefile.PL
 
-	- Shifted all internal entries of the Getopt::Declare hash
-	  into an anonymous hash in the entry "_internal".
+	- Moved mutex test earlier in parameter parsing to
+	  correct an error that caused mutexing to be ignored
+	  (thanks Eric)
 
-	- Patched the Makefile.PL to note dependencies (thanks Roland)
-
-	- Altered parsing of [strict] so that it's ignored when 
-	  commented out.
+	- Fixed hanging when last line was non-NL-terminated
+	  (thanks David)
 
 
 ==============================================================================

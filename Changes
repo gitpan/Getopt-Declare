@@ -49,3 +49,17 @@ Revision history for Perl extension Getopt::Declare.
 
 	- Altered parsing of [strict] so that it's ignored when 
 	  commented out.
+
+
+1.08	Fri May 21 06:17:04 1999
+
+	- Now only generates .CODE file if $::Declare_debug is true
+
+	- Added Text::Balanced as PREREQ to Makefile.PL
+
+	- Moved mutex test earlier in parameter parsing to
+	  correct an error that caused mutexing to be ignored
+	  (thanks Eric)
+
+	- Fixed hanging when last line was non-NL-terminated
+	  (thanks David)

@@ -4,7 +4,7 @@ use strict;
 use vars qw($VERSION);
 use UNIVERSAL qw(isa);
 
-$VERSION = '1.07';
+$VERSION = '1.08';
 
 
 package Getopt::Declare::StartOpt;
@@ -456,25 +456,6 @@ sub code
 		$code .= $self->{args}[$i]->code($i,$package);	#, $flag ????
 	}
 
-	foreach my $action ( @{$self->{actions}} )
-	{
-		$action =~ s{(\s*\{)}
-			    { $1 package $package; };
-		$code .= "\n\t\tdo " . $action . ";\n";
-	}
-
-	if ($flag && $self->{items}==0)
-	{
-		$code .= "\n\t\t\$self->{'$flag'} = '$flag';\n";
-	}
-	foreach my $subarg ( @{$self->{args}} )
-	{
-		$code .= $subarg->cachecode($self->name,$self->{items});
-	}
-
-	if ($flag =~ /\A([^a-z0-9]+)/i)	{ $code .= '$_lastprefix = "'.quotemeta($1).'";'."\n" }
-	else				{ $code .= '$_lastprefix = "";' }
-
 	if ($flag)
 	{
 	    $code .= q#
@@ -498,6 +479,25 @@ sub code
 		}
 		#
 	}
+
+	foreach my $action ( @{$self->{actions}} )
+	{
+		$action =~ s{(\s*\{)}
+			    { $1 package $package; };
+		$code .= "\n\t\tdo " . $action . ";\n";
+	}
+
+	if ($flag && $self->{items}==0)
+	{
+		$code .= "\n\t\t\$self->{'$flag'} = '$flag';\n";
+	}
+	foreach my $subarg ( @{$self->{args}} )
+	{
+		$code .= $subarg->cachecode($self->name,$self->{items});
+	}
+
+	if ($flag =~ /\A([^a-z0-9]+)/i)	{ $code .= '$_lastprefix = "'.quotemeta($1).'";'."\n" }
+	else				{ $code .= '$_lastprefix = "";' }
 
 	$code .= q#
 		$_FOUND_{'# . $self->name . q#'} = 1;
@@ -573,6 +573,10 @@ sub new		# ($self, $grammar; $source)
 # PRESERVE ESCAPED '['s
 
 	$_grammar =~ s/\\\[/\255/g;
+
+# MAKE SURE GRAMMAR ENDS WITH A NEWLINE
+
+	$_grammar =~ s/([^\n])\Z/$1\n/;
 
 # SET-UP
 
@@ -713,7 +717,8 @@ sub new		# ($self, $grammar; $source)
 
 	 open (CODE, ">.CODE")
 	 	and print CODE $self->code($self->{_internal}{'caller'})
-	 	and close CODE;
+	 	and close CODE 
+			if $::Declare_debug;
 
 # DO THE PARSE (IF APPROPRIATE)
 

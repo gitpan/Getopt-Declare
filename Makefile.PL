@@ -2,5 +2,5 @@
 use ExtUtils::MakeMaker;
 WriteMakefile(
 		NAME	=> 'Getopt::Declare',
-		VERSION => '1.07',
+		VERSION => '1.08',
 	     );
