@@ -5,7 +5,7 @@ use vars qw($VERSION);
 use UNIVERSAL qw(isa);
 use Carp;
 
-$VERSION = '1.10';
+$VERSION = '1.11';
 
 sub import {
 	my ($class, $defn) = @_;
@@ -51,12 +51,12 @@ sub _reset_stdtype
 		':i'	=> { pattern => '(?:(?:%T[+-]?)%D+)' },
 		':n'	=> { pattern => '(?:(?:%T[+-]?)(?:%D+(?:%T\.%D*)?(?:%T[eE]%D+)?'
 					. '|%T\.%D+(?:%T[eE]%D+)?))' },
-		':s'	=> { pattern => '(?:%T(?:\S|\0))+' },
-		':qs'	=> { pattern => q{"(?:\\"|[^"])*"|'(?:\\'|[^"])*|(?:%T(?:\S|\0))+} },
-		':id'	=> { pattern => '%T[a-zA-Z_](?:%T\w)*' },
-		':if'	=> { pattern => '%F(?:%T(?:\S|\0))+',
+		':s'	=> { pattern => '(?:%T(?:\S|\0))+(?=\s|\0|\z)' },
+		':qs'	=> { pattern => q{"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|(?:%T(?:\S|\0))+(?=\s|\0|\z)} },
+		':id'	=> { pattern => '%T[a-zA-Z_](?:%T\w)*(?=\s|\0|\z)' },
+		':if'	=> { pattern => '%F(?:%T(?:\S|\0))+(?=\s|\0|\z)',
 			     action => '{reject(!defined $_VAL_ || $_VAL_ ne "-" && ! -r $_VAL_, "in parameter \'$_PARAM_\' (file \"$_VAL_\" is not readable)")}' },
-		':of'	=> { pattern => '%F(?:%T(?:\S|\0))+',
+		':of'	=> { pattern => '%F(?:%T(?:\S|\0))+(?=\s|\0|\z)',
 			     action => '{reject (!defined $_VAL_ || $_VAL_ ne "-" && -e $_VAL_ && ! -w $_VAL_ , "in parameter \'$_PARAM_\' (file \"$_VAL_\" is not writable)")}' },
 		''	=> { pattern => ':s', ind => 1 },
 
@@ -1335,8 +1335,8 @@ Getopt::Declare - Declaratively Expressed Command-Line Arguments via Regular Exp
 
 =head1 VERSION
 
-This document describes version 1.08 of Getopt::Declare,
-released May 21, 1999.
+This document describes version 1.11 of Getopt::Declare,
+released Feb 4, 2003
 
 =head1 SYNOPSIS
 

@@ -1,5 +1,5 @@
 ==============================================================================
-                  Release of version 1.10 of Getopt::Declare
+                  Release of version 1.11 of Getopt::Declare
 ==============================================================================
 
 
@@ -86,36 +86,10 @@ Note: requires the Text::Balanced module
 
 ==============================================================================
 
-CHANGES IN VERSION 1.10
+CHANGES IN VERSION 1.11
 
 
-	- Documented the gotcha of using tabs within a parameter specification
-	  (thanks Dave)
-
-	- Fixed subtle bug with multi-argument parameters (thanks Tim)
-
-	- Documented built-in :id and :qs parameter variable types (thanks Tim)
-
-	- Allowed directives to take whitespace between opening [ and keyword
-
-	- Fixed bug with /.../ patterns within [pvtype:...] directives
-	  (Thanks Tim)
-
-	- Documented need to avoid capturing parens in [pvtype:...] directives
-	  (Thanks Tim)
-
-	- Added \G to -v flag checker to solve nasty problem with embedded
-	  args containing -v
-
-	- Added ability to specify interface directly in use statement
-
-	- Changed matching of initial flags so that -p[rompt] and -p[rompt]2
-	  are seen as distinct
-
-	- Fixed doc nits (thanks Steven and Paul)
-
-	- Added AUTOLOAD to delegate embedded sub calls back to main 
-
+	- Fixed bug in multi-argument parameters
 
 
 ==============================================================================
