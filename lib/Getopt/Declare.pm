@@ -3,9 +3,24 @@ package Getopt::Declare;
 use strict;
 use vars qw($VERSION);
 use UNIVERSAL qw(isa);
+use Carp;
 
-$VERSION = '1.09';
+$VERSION = '1.10';
 
+sub import {
+	my ($class, $defn) = @_;
+	return if @_<2 || ! length $defn;
+	$_[2] = Getopt::Declare->new($defn);
+	exit(0) unless $_[2];
+	delete $_[2]{_internal};
+}
+
+sub AUTOLOAD {
+	use vars '$AUTOLOAD';
+	return if $AUTOLOAD =~ /::DESTROY$/  ;
+	$AUTOLOAD =~ s/.*::/main::/;
+	goto &$AUTOLOAD;
+}
 
 package Getopt::Declare::StartOpt;
 
@@ -165,7 +180,7 @@ sub trailer { '' };	# MEANS TRAILING PARAMETER VARIABLE
 
 sub ows	      
 {
-	return '(?:\s|\0)*('.$_[1].')' unless $_[0]->{nows};
+	return '[\s\0]*('.$_[1].')' unless $_[0]->{nows};
 	return '('.$_[1].')';
 }
 
@@ -178,10 +193,10 @@ use vars qw { @ISA };
 sub matcher	# ($self, $trailing)
 {
 	my ($self, $trailing) = @_;
-	my $suffix = (defined $trailing && !$trailing) ? '\s+' : '';
+	my $suffix = (defined $trailing && !$trailing) ? '([\s\0]+)' : '';
 	my $scalar = $self->SUPER::matcher($trailing);
 
-	return $scalar.'(?:\s+'.$scalar.')*'.$suffix;
+	return $scalar.'(?:[\s\0]+'.$scalar.')*'.$suffix;
 }
 
 sub code	# ($self, $pos, $package)
@@ -252,7 +267,7 @@ sub trailer  { $_[0]->{text} };
 
 sub ows	      
 {
-	return '(?:\s|\0)*('.$_[1].')' unless $_[0]->{nows};
+	return '[\s\0]*('.$_[1].')' unless $_[0]->{nows};
 	return '('.$_[1].')';
 }
 
@@ -303,6 +318,7 @@ sub new		# ($class, $spec, $desc, $dittoflag)
 	my $self =
 	{
 		flag 	     => '',
+		flagid       => '',
 		args	     => [],
 		actions	     => [],
 		ditto	     => $ditto,
@@ -314,6 +330,8 @@ sub new		# ($class, $spec, $desc, $dittoflag)
 	};
 
 	$self->{desc} =~ s/\A\s*(.*?)\s*\Z/$1/;
+
+	my $ws_seen = "";
 
 	while ($spec)
 	{
@@ -359,7 +377,12 @@ sub new		# ($class, $spec, $desc, $dittoflag)
 		{
 			my ($ows, $punct) = ($1,$2);
 			$punct =~ s/\\(?!\\)(.)/$1/g;
-			if ($first) { $self->{flag} = $punct; push @flags, $punct; }
+			if ($first) {
+				$spec =~ m/\A(\S+)/;
+				$self->{flagid} = $punct.($1||"");
+				$self->{flag} = $punct;
+				push @flags, $punct;
+			}
 
 			else	    { push @{$self->{args}},
 					new Getopt::Declare::Punctuator ($punct,!length($ows));
@@ -387,12 +410,13 @@ sub code
 
 	my $code = "\n";
 	my $flag = $self->{flag};
+	my $flagid = $self->{flagid};
 	my $clump = $owner->{_internal}{clump};
 	my $i = 0;
 	my $nocase = (Getopt::Declare::_nocase() || $self->{nocase} ? 'i' : '');
 
-	$code .= (!$self->{repeatable})
-			? q#	    param: while (!$_FOUND_{'# . $self->name . q#'}#
+	$code .= (!$self->{repeatable} && !$owner->{_internal}{all_rep})
+			? q#	    param: while (!$_FOUND_{'# . $self->id . q#'}#
 			: q#	    param: while (1#;
 
 	if ($flag && ($clump==1 && $flag !~ /\A[^a-z0-9]+[a-z0-9]\Z/i
@@ -408,10 +432,10 @@ sub code
 
 	if ($flag)
 	{
-		#WAS: $_args =~ m/\G(?:\s|\0)*\Q# . $flag . q#\E/g# . $nocase
+		#WAS: $_args =~ m/\G[\s\0]*\Q# . $flag . q#\E/g# . $nocase
 		$code .= q#
 	
-		$_args && $_args =~ m/\G(?:\s|\0)*# . quotemeta($flag) . q#/g# . $nocase
+		$_args && $_args =~ m/\G[\s\0]*# . quotemeta($flag) . q#/g# . $nocase
 		. q# or last;
 		$_errormsg = q|incorrect specification of '# . $flag . q#' parameter| unless $_errormsg;
 
@@ -510,10 +534,14 @@ sub code
 		  #;
 }
 
-sub name
-{
+sub name {
 	my $self = shift;
 	return $self->{flag} || "<$self->{args}[0]{name}>";
+}
+
+sub id {
+	my $self = shift;
+	return $self->{flagid} || "<$self->{args}[0]{name}>";
 }
 
 
@@ -600,10 +628,10 @@ sub new		# ($self, $grammar; $source)
 
 	# TYPE DIRECTIVE:
 
-		#WAS: if (m/\A\s*\[pvtype:/ and $_action = extract_codeblock($_,'[{}]'))
-		if (m/\A\s*\[pvtype:/ and $_action = extract_codeblock($_,'[]'))
+		s{\A(\s*\[\s*pvtype:\s*\S+\s+)/}{$1 qr/};
+		if (m/\A\s*\[\s*pvtype:/ and $_action = extract_codeblock($_,'[]'))
 		{
-			$_action =~ s/.*?\[pvtype:\s*//;
+			$_action =~ s/.*?\[\s*pvtype:\s*//;
 			_typedef($_action);
 			next;
 		}
@@ -642,7 +670,7 @@ sub new		# ($self, $grammar; $source)
 
 			$desc .= $1 while s/\A((?![ 	]*({|\n)|.*?\S.*?\t.*?\S).*?\S.*\n)//;
 			
-			$_lastdesc and $desc =~ s/\A\s*\[ditto\]/$_lastdesc/
+			$_lastdesc and $desc =~ s/\A\s*\[\s*ditto\s*\]/$_lastdesc/
 				  and $ditto = 1;
 			$_lastdesc = $desc;
 
@@ -656,11 +684,11 @@ sub new		# ($self, $grammar; $source)
 
 	# OTHERWISE: DECORATION
 
-		s/((?:(?!\[pvtype:).)*)(\n|(?=\[pvtype:))//;
+		s/((?:(?!\[\s*pvtype:).)*)(\n|(?=\[\s*pvtype:))//;
 		my $decorator = $1;
 		$_strict ||= $decorator =~ /\Q[strict]/;
 		_infer($decorator, undef, $_mutex);
-		$_all_repeatable = 1 if $decorator =~ /\[repeatable\]/;
+		$_all_repeatable = 1 if $decorator =~ /\[\s*repeatable\s*\]/;
 	}
 
 	my $_lastactions;
@@ -670,11 +698,6 @@ sub new		# ($self, $grammar; $source)
 			{ $_->{actions} = $_lastactions }
 		else
 			{ $_lastactions = $_->{actions} }
-
-		if ($_all_repeatable)
-		{
-			$_->{repeatable} = 1;
-		}
 	}
 
 	@_args = sort
@@ -689,11 +712,11 @@ sub new		# ($self, $grammar; $source)
 
 # CONSTRUCT OBJECT ITSELF
 
-	my $clump = ($_grammar =~ /\[cluster:\s*none\s*\]/i)     ? 0
-		  : ($_grammar =~ /\[cluster:\s*singles?\s*\]/i) ? 1
-		  : ($_grammar =~ /\[cluster:\s*flags?\s*\]/i)   ? 2
-		  : ($_grammar =~ /\[cluster:\s*any\s*\]/i)      ? 3
-		  : ($_grammar =~ /\[cluster:(.*)\s*\]/i)  	 ?
+	my $clump = ($_grammar =~ /\[\s*cluster:\s*none\s*\]/i)     ? 0
+		  : ($_grammar =~ /\[\s*cluster:\s*singles?\s*\]/i) ? 1
+		  : ($_grammar =~ /\[\s*cluster:\s*flags?\s*\]/i)   ? 2
+		  : ($_grammar =~ /\[\s*cluster:\s*any\s*\]/i)      ? 3
+		  : ($_grammar =~ /\[\s*cluster:(.*)\s*\]/i)  	 ?
 			die "Error: unknown clustering mode: [cluster:$1]\n"
 		  :						   3;
 
@@ -709,6 +732,7 @@ sub new		# ($self, $grammar; $source)
 			strict	=> $_strict,
 			clump	=> $clump,
 			source  => '',
+			all_rep => $_all_repeatable,
 			'caller'  => scalar caller(),
 		}
 	}, ref($_class)||$_class;
@@ -895,9 +919,9 @@ sub _infer  # ($desc, $arg, $mutex)
 	my ($desc, $arg, $mutex) = @_;
 
 	_mutex($mutex, split(' ',$1))
-		while $desc =~ s/\[mutex:\s*(.*?)\]//i;
+		while $desc =~ s/\[\s*mutex:\s*(.*?)\]//i;
 
-	if ( $desc =~ m/\[no\s*case\]/i)
+	if ( $desc =~ m/\[\s*no\s*case\s*\]/i)
 	{
 		if ($arg) { $arg->{nocase} = 1 }
 		else	  { _nocase(1); }
@@ -906,15 +930,15 @@ sub _infer  # ($desc, $arg, $mutex)
 	if (defined $arg)
 	{
 		_exclude($mutex, $arg->name, (split(' ',$1)))
-			if $desc =~ m/.*\[excludes:\s*(.*?)\]/i;
+			if $desc =~ m/.*\[\s*excludes:\s*(.*?)\]/i;
 		$arg->{requires} = $1
-			if $desc =~ m/.*\[requires:\s*(.*?)\]/i;
+			if $desc =~ m/.*\[\s*requires:\s*(.*?)\]/i;
 
-		$arg->{required}   = ( $desc =~ m/\[required\]/i );
-		$arg->{repeatable} = ( $desc =~ m/\[repeatable\]/i );
+		$arg->{required}   = ( $desc =~ m/\[\s*required\s*\]/i );
+		$arg->{repeatable} ||= ( $desc =~ m/\[\s*repeatable\s*\]/i );
 	}
 
-	_typedef($desc) while $desc =~ s/.*?\[pvtype:\s*//;
+	_typedef($desc) while $desc =~ s/.*?\[\s*pvtype:\s*//;
 }
 
 sub _typedef
@@ -1017,7 +1041,7 @@ sub usage
 
 	# TYPE DIRECTIVE:
 
-		if (m/\A\s*\[pvtype:/ and extract_codeblock($_,'[{}]'))
+		if (m/\A\s*\[\s*pvtype:/ and extract_codeblock($_,'[{}]'))
 		{
 			next;
 		}
@@ -1039,11 +1063,11 @@ sub usage
 			$desc .= (expand $1)[0]
 				while s/\A((?![ 	]*({|\n)|.*?\S.*?\t.*?\S).*?\S.*\n)//;
 
-			next if $desc =~ /\[undocumented\]/i;
+			next if $desc =~ /\[\s*undocumented\s*\]/i;
 
 			$uoff = 0;
 			$spec =~ s/(<[a-zA-Z]\w*):([^>]+)>/$uoff+=1+length $2 and "$1>"/ge;
-			$ditto = $desc =~ /\A\s*\[ditto\]/;
+			$ditto = $desc =~ /\A\s*\[\s*ditto\s*\]/;
 			$desc =~ s/^\s*\[.*?\]\s*\n//gm;
 			$desc =~ s/\[.*?\]//g;
 
@@ -1062,7 +1086,7 @@ sub usage
 
 
 	# OTHERWISE, DECORATION
-		if (s/((?:(?!\[pvtype:).)*)(\n|(?=\[pvtype:))//)
+		if (s/((?:(?!\[\s*pvtype:).)*)(\n|(?=\[\s*pvtype:))//)
 		{
 			my $desc = $1.($2||'');
 			$desc =~ s/^(\s*\[.*?\])+\s*\n//gm;
@@ -1196,7 +1220,7 @@ sub code
 		pos $_args = $_nextpos if defined $_args;
 
 		$self->usage(0) if $_args && $_args =~ m/\G(# . $self->{_internal}{helppat} . q#)(\s|\0|\Z)/g;
-		$self->version(0) if $_args && $_args =~ m/(# . $self->{_internal}{verspat} . q#)(\s|\0|\Z)/;
+		$self->version(0) if $_args && $_args =~ m/\G(# . $self->{_internal}{verspat} . q#)(\s|\0|\Z)/g;
 
 	#;
 
@@ -1215,7 +1239,7 @@ sub code
 	  }
 	
 	  pos $_args = $_nextpos;
-	  $_args && $_args =~ m/\G(?:\s|\0)*(\S+)/g or last;
+	  $_args && $_args =~ m/\G[\s\0]*(\S+)/g or last;
 	  if ($_errormsg) { print STDERR "Error"."$self->{_internal}{source}: $_errormsg\n" }
 
 	  else { push @_unused, $1; }
@@ -1224,7 +1248,7 @@ sub code
 	  continue
 	  {
 		$_nextpos = pos $_args if defined $_args;
-		if (defined $_args and $_args =~ m/\G(\s|\0)*\Z/g)
+		if (defined $_args and $_args =~ m/\G[\s\0]*\Z/g)
 		{
 			$_args = &{$_get_nextline}($self);
 			last unless defined($_args);
@@ -1318,7 +1342,11 @@ released May 21, 1999.
 
  use Getopt::Declare;
 
- $args = new Getopt::Declare ($specification_string, $optional_source);
+ $args = Getopt::Declare->new($specification_string, $optional_source);
+
+ # or:
+
+ use Getopt::Declare $specification_string => $args;
 
 
 =head1 DESCRIPTION
@@ -1333,7 +1361,12 @@ To parse the command-line in C<@ARGV>, one simply creates a
 F<Getopt::Declare> object, by passing C<Getopt::Declare::new()> a
 specification of the various parameters that may be encountered:
 
-	$args = new Getopt::Declare($specification);
+	use Getopt::Declare;
+	$args = Getopt::Declare->new($specification);
+
+This may also be done in a one-liner:
+
+	use Getopt::Declare, $specification => $args;
 
 The specification is a single string such as this:
 
@@ -1533,8 +1566,8 @@ actions to be performed when the parameter is matched.
 The parameter definition consists of a leading flag or parameter
 variable, followed by any number of parameter variables or
 punctuators, optionally separated by spaces. The parameter definition
-is terminated by one or more tabs (at least one trailing tab I<must>
-be present).
+is terminated by the first tab that is encountered after the start
+of the parameter definition.  At least one trailing tab I<must> be present.
 
 For example, all of the following are valid F<Getopt::Declare> parameter
 definitions:
@@ -1591,7 +1624,7 @@ or comma-delimited string. For example, the parameter:
 
 	-val <value>	
 
-would match any of the following the arguments:
+would match any of the following arguments:
 
 	-value			# <value> <- "ue"
 	-val abcd		# <value> <- "abcd"
@@ -1700,7 +1733,7 @@ variant) is optional, but strongly recommended. Apart from providing internal
 documentation, parameter descriptions are used in the automatically-generated
 usage information provided by F<Getopt::Declare>.
 
-Descriptions may be placed after the tab(s) following the
+Descriptions may be placed after the first tab(s) following the
 parameter definition and may be continued on subsequent lines,
 provided those lines do not contain any tabs after the first
 non-whitespace character (because any such line will instead be
@@ -1725,6 +1758,22 @@ The parameter description may also contain special directives which
 alter the way in which the parameter is parsed. See the various
 subsections of L<"ADVANCED FEATURES"> for more information.
 
+A common mistake is to use tabs to separate components of a parameter
+description:
+
+	-delete	<filename>		Delete the named file
+	-d	<filename>		Delete the named file
+
+The tabs after C<"-delete"> and C<"-d"> do a good job of lining up the
+two C<"<filenameE<gt>"> parameter variables, but they also mark the 
+start of the description, which means that after descriptions are
+stripped, the two parameters are:
+
+	-delete
+	-d
+
+The solution is to use spaces, not tabs, to align components within a
+parameter specification.
 
 =head2 Actions
 
@@ -1738,10 +1787,10 @@ for a means of delaying this response).
 
 For example:
 
-	-v	Verbose mode
-			{ $::verbose = 1; }
-	-q	Quiet mode
-			{ $::verbose = 0; }
+        -v      Verbose mode
+                        { $::verbose = 1; }
+        -q      Quiet mode
+                        { $::verbose = 0; }
 
 Actions are executed (as C<do> blocks) in the package in which the
 F<Getopt::Declare> object containing them was created. Hence they
@@ -1751,15 +1800,15 @@ In addition, each parameter variable belonging to the corresponding
 parameter is made available as a (block-scoped) Perl variable with the
 same name. For example:
 
-	+range <from>..<to>	Set range
-					{ setrange($from, $to); }
+        +range <from>..<to>     Set range
+                                        { setrange($from, $to); }
 
-	-list <page:i>...	Specify pages to list
-					{ foreach (@page)
-					  {
-						list($_) if $_ > 0;
-					  }
-					}
+        -list <page:i>...       Specify pages to list
+                                        { foreach (@page)
+                                          {
+                                                list($_) if $_ > 0;
+                                          }
+                                        }
 
 Note that scalar parameter variables become scalar Perl variables,
 and list parameter variables become Perl arrays.
@@ -1785,11 +1834,11 @@ The hash is indexed by the punctuator itself. The main purpose of this variable
 is to allow actions to check whether optional punctuators were in fact matched.
 For example:
 
-	-v[erbose]	Set verbose mode
-			(doubly verbose if full word used)
-			    { if ($_PUNCT_{"erbose"}) { $verbose = 2; }
-			      else		      { $verbose = 1; }
-			    }
+        -v[erbose]      Set verbose mode
+                        (doubly verbose if full word used)
+                            { if ($_PUNCT_{"erbose"}) { $verbose = 2; }
+                              else                    { $verbose = 1; }
+                            }
 
 =item C<%_FOUND_>
 
@@ -1800,15 +1849,15 @@ specification makes the C<-q> and C<-v> parameters mutually exclusive
 (but see L<"Parameter dependencies"> for a I<much> easier way to achieve
 this effect):
 
-	-v	Set verbose mode
-			{ die "Can't be verbose *and* quiet!\n"
-				if $_FOUND_{"-q"};
-			}
+        -v      Set verbose mode
+                        { die "Can't be verbose *and* quiet!\n"
+                                if $_FOUND_{"-q"};
+                        }
 
-	-q	Set quiet mode
-			{ die "Can't be quiet *and* verbose!\n"
-				if $_FOUND_{"-v"};
-			}
+        -q      Set quiet mode
+                        { die "Can't be quiet *and* verbose!\n"
+                                if $_FOUND_{"-v"};
+                        }
 
 For reasons that will be explained in L<"Rejection and termination">,
 a given parameter is not marked as found until I<after> its
@@ -1830,11 +1879,11 @@ itself.
 =head2 The command-line parsing process
 
 Whenever a F<Getopt::Declare> object is created, the current command-line
-is parsed by sequentially, by attempting to match each parameter
+is parsed sequentially, by attempting to match each parameter
 in the object's specification string against the current elements in the
 C<@ARGV> array (but see L<"Parsing from other sources">). The order
-in which parameters are tried against C<@ARGV> is determined by
-three rules:
+in which parameters are compared against the arguments in C<@ARGV>
+is determined by three rules:
 
 =over 4
 
@@ -1858,6 +1907,16 @@ Otherwise, parameters are matched in the order they are defined.
 
 =back
 
+Note, however, that the I<arguments> themselves are considered strictly
+in the order they appear on the command line. That is: Getopt::Declare
+takes the first (leftmost) argument and compares it against all the
+parameter specifications in the order described above. Then it gets the
+second argument and does the same. Et cetera. So, whilst parameters are
+considered "flags-first-by-length", arguments are considered
+"left-to-right". If that seems paradoxical, you probably need to review
+the difference between "arguments" and "parameters", as explained
+in L<"Terminology">.
+
 Elements of C<@ARGV> which do not match any defined parameter are collected
 during the parse and are eventually put back into C<@ARGV>
 (see L<"Strict and non-strict command-line parsing">).
@@ -1876,16 +1935,16 @@ If a C<[nocase]> directive is included in the description of a
 specific parameter variant, then that variant (only) will be matched
 without regard for case. For example, the specification:
 
-	-q	Quiet mode [nocase]
+        -q      Quiet mode [nocase]
 
-	-v	Verbose mode
+        -v      Verbose mode
 
 means that the arguments "S<-q>" and "S<-Q>" will both match the C<-q> parameter, but
 that only "S<-v>" (and I<not> "S<-V>") will match the C<-v> parameter.
 
 If a C<[nocase]> directive appears anywhere I<outside> a parameter description,
 then the entire specification is declared case-insensitive and all parameters
-defined in that specification are matched without reagrd to case.
+defined in that specification are matched without regard to case.
 
 
 =head2 Termination and rejection
@@ -1899,14 +1958,14 @@ command-line processing is terminated at once (although the current
 parameter is still marked as having been successfully matched). For
 example:
 
-	--	Traditional argument list terminator
-			{ finish }
+        --      Traditional argument list terminator
+                        { finish }
 
-	-no--	Use non-traditional terminator instead
-			{ $nontrad = 1; }
+        -no--   Use non-traditional terminator instead
+                        { $nontrad = 1; }
 
-	##	Non-traditional terminator (only valid if -no-- flag seen)
-			{ finish($nontrad); }
+        ##      Non-traditional terminator (only valid if -no-- flag seen)
+                        { finish($nontrad); }
 
 It is also possible to reject a single parameter match from within an
 action (and then continue trying other candidates). This allows
@@ -1919,18 +1978,18 @@ C<reject> operator takes an optional argument.
 If the argument is true (or was omitted), the current parameter
 match is immediately rejected. For example:
 
-	-ar <R:n>	Set aspect ratio (must be in the range (0..1])
-				{
-				  $::sawaspect++;
-				  reject $R <= 0 || $R > 1 ;
-				  setaspect($R);
-				}
+        -ar <R:n>       Set aspect ratio (must be in the range (0..1])
+                                {
+                                  $::sawaspect++;
+                                  reject $R <= 0 || $R > 1 ;
+                                  setaspect($R);
+                                }
 
-	-q		Quiet option (not available on Wednesdays)
-				{
-				  reject((localtime)[6] == 3);
-				  $::verbose = 0;
-				}
+        -q              Quiet option (not available on Wednesdays)
+                                {
+                                  reject((localtime)[6] == 3);
+                                  $::verbose = 0;
+                                }
 
 Note that any actions performed I<before> the call to C<reject> will
 still have effect (for example, the variable C<$::sawaspect> remains
@@ -1940,11 +1999,11 @@ The C<reject> operator may also take a second argument, which is
 used as an error message if the rejected argument subsequently
 fails to match any other parameter. For example:
 
-	-q	Quiet option (not available on Wednesdays)
-			{
-			  reject((localtime)[6] == 3 => "Not today!");
-			  $::verbose = 0;
-			}
+        -q      Quiet option (not available on Wednesdays)
+                        {
+                          reject((localtime)[6] == 3 => "Not today!");
+                          $::verbose = 0;
+                        }
 
 
 =head2 Specifying other parameter variable types
@@ -1979,11 +2038,17 @@ is: 0, 1, 2, 3, etc.)
 which restricts a parameter variable to matching non-negative numbers (that
 is, floating point numbers greater than or equal to zero).
 
-=item :s  
+=item :qs  
 
 which allows a parameter variable to match any quote-delimited or
 whitespace-terminated string. Note that this specifier simply makes
 explicit the default behaviour.
+
+=item :id  
+
+which allows a parameter variable to match any identifier
+sequence. That is: a alphabetic or underscore, followed by
+zero-or-more alphanumerics or underscores.
 
 =item :if  
 
@@ -2009,20 +2074,20 @@ explicit the default behaviour.
 
 For example:
 
-	-repeat <count:+i>	Repeat <count> times (must be > 0)
+        -repeat <count:+i>      Repeat <count> times (must be > 0)
 
-	-scale <factor:0+n>	Set scaling factor (cannot be negative)
+        -scale <factor:0+n>     Set scaling factor (cannot be negative)
 
 
 Alternatively, parameter variables can be restricted to matching a
 specific regular expression, by providing the required pattern
 explicitly (in matched "/" delimiters after the ":"). For example:
 
-	-parity <p:/even|odd|both/>	Set parity (<p> must be "even",
-					"odd" or "both")
+        -parity <p:/even|odd|both/>     Set parity (<p> must be "even",
+                                        "odd" or "both")
 
-	-file <name:/\w*\.[A-Z]{3}/>	File name must have a three-
-					capital-letter extension
+        -file <name:/\w*\.[A-Z]{3}/>    File name must have a three-
+                                        capital-letter extension
 
 If an explicit regular expression is used, there are three "convenience"
 extensions available:
@@ -2035,7 +2100,7 @@ If the sequence C<%T> appears in a pattern, it is translated to a negative
 lookahead containing the parameter variable's trailing context.
 Hence the parameter definition:
 
-	-find <what:/(%T\.)+/> ;
+        -find <what:/(%T\.)+/> ;
 
 ensures that the command line argument "-find abcd;" causes C<E<lt>whatE<gt>>
 to match "abcd", I<not> "abcd;".
@@ -2074,29 +2139,33 @@ the pattern and action are optional).
 
 The name string may be I<any> whitespace-terminated sequence of
 characters which does not include a ">". The name may also be specified
-within a pair of quotation marks (single or double) or within any Perl
-quotelike operation. For example:
+within a pair of quotation marks (single or double) or within any 
+Perl quotelike operation. For example:
 
-	[pvtype: num     ]	# Makes this valid: -count <N:num>
-	[pvtype: 'a num' ]	# Makes this valid: -count <N:a num>
-	[pvtype: q{nbr}  ]	# Makes this valid: -count <N:nbr>
+        [pvtype: num     ]      # Makes this valid: -count <N:num>
+        [pvtype: 'a num' ]      # Makes this valid: -count <N:a num>
+        [pvtype: q{nbr}  ]      # Makes this valid: -count <N:nbr>
 
 The pattern is used in initial matching of the parameter variable.
-Patterns are normally specified as a "/"-delimited Perl regular
+Patterns are normally specified as a "/.../"-delimited Perl regular
 expression:
 
-	[pvtype: num      /\d+/        ]	
-	[pvtype: 'a num'  /\d+(\.\d*)/ ]
-	[pvtype: q{nbr}   /[+-]?\d+/   ]
+        [pvtype: num      /\d+/          ]        
+        [pvtype: 'a num'  /\d+(?:\.\d*)/ ]
+        [pvtype: q{nbr}   /[+-]?\d+/     ]
+
+Note that the regular expression should I<not> contain any capturing 
+parentheses, as this will interfere with the correct processing of
+subsequent parameter variables.
 
 Alternatively the pattern associated with a new type may be specified
 as a ":" followed by the name of another parameter variable type (in
 quotes if necessary). In this case the new type matches the same
 pattern (and action! - see below) as the named type.  For example:
 
-	[pvtype: num      :+i      ]	# <X:num> is the same as <X:+i>
-	[pvtype: 'a num'  :n       ]	# <X:a num> is the same as <X:n>
-	[pvtype: q{nbr}   :'a num' ]	# <X:nbr> is also the same as <X:n>
+        [pvtype: num      :+i      ]    # <X:num> is the same as <X:+i>
+        [pvtype: 'a num'  :n       ]    # <X:a num> is the same as <X:n>
+        [pvtype: q{nbr}   :'a num' ]    # <X:nbr> is also the same as <X:n>
 
 As a third alternative, the pattern may be omitted altogether, in
 which case the new type matches whatever the inbuilt pattern ":s"
@@ -2107,12 +2176,12 @@ directive is executed I<after> the corresponding parameter variable
 matches the command line but I<before> any actions belonging to the
 enclosing parameter are executed. Typically, such type actions
 will call the C<reject> operator (see L<"Termination and rejection">)
-to test extra conditions, but any valid Perl code is acceptible. For
+to test extra conditions, but any valid Perl code is acceptable. For
 example:
 
-	[pvtype: num      /\d+/    { reject if (localtime)[6]==3 }	]
-	[pvtype: 'a num'  :n       { print "a num!" }		]
-	[pvtype: q{nbr}   :'a num' { reject $::no_nbr }		]
+        [pvtype: num    /\d+/    { reject if (localtime)[6]==3 }      ]
+        [pvtype: 'a num'  :n       { print "a num!" }           ]
+        [pvtype: q{nbr}   :'a num' { reject $::no_nbr }         ]
 
 If a new type is defined in terms of another (for example, ":a num"
 and ":nbr" above), any action specified by that new type is
@@ -2166,18 +2235,18 @@ which contains the name of the parameter currently being matched.
 
 Here is a example of the use of these variables:
 
-	$args = new Getopt::Declare <<'EOPARAM';
+        $args = new Getopt::Declare <<'EOPARAM';
 
-	[pvtype: type  /[OAB]|AB')/	                                ]
-	[pvtype: Rh?   /Rh[+-]/					        ]
-	[pvtype: days  :+i  { reject $_VAL_<14 " $_PARAM_ (too soon!)"} ]
+        [pvtype: type  /[OAB]|AB')/                                     ]
+        [pvtype: Rh?   /Rh[+-]/                                         ]
+        [pvtype: days  :+i  { reject $_VAL_<14 " $_PARAM_ (too soon!)"} ]
 
-	  -donated <D:days>		  Days since last donation
-	  -applied <A:days>		  Days since applied to donate
+          -donated <D:days>               Days since last donation
+          -applied <A:days>               Days since applied to donate
 
-	  -blood <type:type> [<rh:Rh?>]	  Specify blood type
-					  and (optionally) rhesus factor
-	EOPARAM
+          -blood <type:type> [<rh:Rh?>]   Specify blood type
+                                          and (optionally) rhesus factor
+        EOPARAM
 
 In the above example, the ":days" parameter variable type is defined
 to match whatever the ":+i" type matches (that is positive, non-zero
@@ -2186,19 +2255,19 @@ be at least 14. If a shorter value is specified for C<E<lt>DE<gt>>,
 or C<E<lt>AE<gt>> parameter variables, then F<Getopt::Declare> would
 issue the following (respective) error messages:
 
-	Error: -donated (too soon!)
-	Error: -applied (too soon!)
+        Error: -donated (too soon!)
+        Error: -applied (too soon!)
 
 Note that the "inbuilt" parameter variable types ("i", "n", etc.) are
 really just predefined type names, and hence can be altered if necessary:
 
-	$args = new Getopt::Declare <<'EOPARAM';
+        $args = new Getopt::Declare <<'EOPARAM';
 
-	[pvtype: 'n' /[MDCLXVI]+/ { reject !($_VAL_=to_roman $_VAL_) } ]
+        [pvtype: 'n' /[MDCLXVI]+/ { reject !($_VAL_=to_roman $_VAL_) } ]
 
-		-index <number:n>	Index number
-			{ print $data[$number]; }
-	EOPARAM
+                -index <number:n>       Index number
+                        { print $data[$number]; }
+        EOPARAM
 
 The above C<[pvtype:...]> directive means that all parameter variables
 specified with a type ":n" henceforth only match valid Roman
@@ -2215,8 +2284,8 @@ placed upon it by the redefinition of type ":n".
 Note too that, because the ":+n" and ":0+n" types are implicitly 
 defined in terms of the original ":n" type (as if the directives:
 
-	[pvtype: '+n'  :n { reject if $_VAL <= 0  }  ]
-	[pvtype: '0+n' :n { reject if $_VAL < 0   }  ]
+        [pvtype: '+n'  :n { reject if $_VAL <= 0  }  ]
+        [pvtype: '0+n' :n { reject if $_VAL < 0   }  ]
 
 were included in every specification), the above redefinition of ":n"
 affects those types as well. In such cases the format conversion is
@@ -2240,8 +2309,8 @@ feature enables the programmer to specify some undocumented action
 which is to be taken on encountering an otherwise unknown argument.
 For example:
 
-	<unknown>	
-			{ handle_unknown($unknown); }
+        <unknown>       
+                        { handle_unknown($unknown); }
 
 
 =head2 "Dittoed" parameters
@@ -2254,29 +2323,29 @@ a C<[ditto]> directive, that directive is replaced with the
 description for the immediately preceding parameter (including any
 other directives). For example:
 
-	-v		Verbose mode
-	--verbose	[ditto] (long form)
+        -v              Verbose mode
+        --verbose       [ditto] (long form)
 
 In the automatically generated usage information this would be displayed as:
 
-	-v		Verbose mode
-	--verbose	   "     "   (long form)
+        -v              Verbose mode
+        --verbose          "     "   (long form)
 
 Furthermore, if the "dittoed" parameter has no action(s) specified, the
 action(s) of the preceding parameter are reused. For example, the
 specification:
 
-	-v		Verbose mode
-				{ $::verbose = 1; }
-	--verbose	[ditto]
+        -v              Verbose mode
+                                { $::verbose = 1; }
+        --verbose       [ditto]
 
 would result in the C<--verbose> option setting C<$::verbose> just like the
 C<-v> option. On the other hand, the specification:
 
-	-v		Verbose mode
-				{ $::verbose = 1; }
-	--verbose	[ditto]
-				{ $::verbose = 2; }
+        -v              Verbose mode
+                                { $::verbose = 1; }
+        --verbose       [ditto]
+                                { $::verbose = 2; }
 
 would give separate actions to each flag.
 
@@ -2297,14 +2366,14 @@ deferred blocks are never executed.
 
 For example:
 
-	<files>...	Files to be processed
-			    { defer { foreach (@files) { proc($_); } } }
+        <files>...      Files to be processed
+                            { defer { foreach (@files) { proc($_); } } }
 
-	-rev[erse]	Process in reverse order
-			    { $::ordered = -1; }
+        -rev[erse]      Process in reverse order
+                            { $::ordered = -1; }
 
-	-rand[om]	Process in random order
-			    { $::ordered = 0; }
+        -rand[om]       Process in random order
+                            { $::ordered = 0; }
 
 With the above specification, the C<-rev> and/or C<-rand> flags can be
 specified I<after> the list of files, but still affect the processing of
@@ -2321,19 +2390,19 @@ flags to be "clustered". That is, if two or more flags have the same
 those flags may be concatenated behind a single copy of that flag prefix.
 For example, given the parameter specifications:
 
-	-+		Swap signs
-	-a		Append mode
-	-b		Bitwise compare
-	-c <FILE>	Create new file
-	+del		Delete old file
-	+e <NICE:i>	Execute (at specified nice level) when complete
+        -+              Swap signs
+        -a              Append mode
+        -b              Bitwise compare
+        -c <FILE>       Create new file
+        +del            Delete old file
+        +e <NICE:i>     Execute (at specified nice level) when complete
 
 The following command-lines (amongst others) are all exactly equivalent:
 
-	-a -b -c newfile +e20 +del
-	-abc newfile +dele20
-	-abcnewfile+dele20
-	-abcnewfile +e 20del
+        -a -b -c newfile +e20 +del
+        -abc newfile +dele20
+        -abcnewfile+dele20
+        -abcnewfile +e 20del
 
 The last two alternatives are correctly parsed because
 F<Getopt::Declare> allows flag clustering at I<any point> where the
@@ -2355,10 +2424,10 @@ In some circumstances a clustered sequence of flags on the command-line
 might also match a single (multicharacter) parameter flag. For example, given
 the specifications:
 
-	-a		Blood type is A
-	-b		Blood type is B
-	-ab	 	Blood type is AB
-	-ba	 	Donor has a Bachelor of Arts
+        -a              Blood type is A
+        -b              Blood type is B
+        -ab             Blood type is AB
+        -ba             Donor has a Bachelor of Arts
 
 A command-line argument "-aba" might be parsed as
 S<"-a -b -a"> or S<"-a -ba"> or S<"-ab -a">. In all such
@@ -2401,16 +2470,16 @@ This version of the directive turns off clustering completely.
 
 For example:
 
-	$args = new Getopt::Declare <<'EOSPEC';
-		-a		Append mode
-		-b		Back-up mode
-		-bu		[ditto]
-		-c <file>	Copy mode
-		-d [<file>]	Delete mode
-		-e[xec]		Execute mode
+        $args = new Getopt::Declare <<'EOSPEC';
+                -a              Append mode
+                -b              Back-up mode
+                -bu             [ditto]
+                -c <file>       Copy mode
+                -d [<file>]     Delete mode
+                -e[xec]         Execute mode
 
-		[cluster:singles]
-	EOSPEC
+                [cluster:singles]
+        EOSPEC
 
 In the above example, only the C<-a> and C<-b> parameters may be clustered.
 The C<-bu> parameter is excluded because it consists of more than one
@@ -2445,14 +2514,14 @@ However, if a new F<Getopt::Declare> object is created with a
 specification string containing the C<[strict]> directive (at any
 point in the specification):
 
-	$args = new Getopt::Declare <<'EOSPEC';
+        $args = new Getopt::Declare <<'EOSPEC';
 
-		[strict]
+                [strict]
 
-		-a	Append mode
-		-b	Back-up mode
-		-c	Copy mode
-	EOSPEC
+                -a      Append mode
+                -b      Back-up mode
+                -c      Copy mode
+        EOSPEC
 
 then the command-line is parsed "strictly". In this case, any
 unrecognized argument causes an error message (see L<"DIAGNOSTICS">) to
@@ -2524,25 +2593,25 @@ more than once.  Any parameter whose description includes the directive
 C<[repeatable]> is I<never> excluded as a potential argument match, no matter
 how many times it has matched previously:
 
-	-nice		Increase nice value (linearly if repeated)
-			[repeatable]
-				{ set_nice( get_nice()+1 ); }
+        -nice           Increase nice value (linearly if repeated)
+                        [repeatable]
+                                { set_nice( get_nice()+1 ); }
 
-	-w		Toggle warnings [repeatable] for the rest
-			of the command-line 
-				{ $warn = !$warn; }
+        -w              Toggle warnings [repeatable] for the rest
+                        of the command-line 
+                                { $warn = !$warn; }
 
 As a more general mechanism is a C<[repeatable]> directive appears in a
 specification anywhere other than a flag's description, then I<all> parameters
 are marked repeatable:
 
-	[repeatable]
+        [repeatable]
 
-	-nice		Increase nice value (linearly if repeated)
-				{ set_nice( get_nice()+1 ); }
+        -nice           Increase nice value (linearly if repeated)
+                                { set_nice( get_nice()+1 ); }
 
-	-w		Toggle warnings for the rest of the command-line 
-				{ $warn = !$warn; }
+        -w              Toggle warnings for the rest of the command-line 
+                                { $warn = !$warn; }
 
 
 =item C<[mutex: E<lt>flag listE<gt>]>
@@ -2551,12 +2620,12 @@ The C<[mutex:...]> directive specifies that the parameters whose
 flags it lists are mutually exclusive. That is, no two or more of them
 may appear in the same command-line. For example:
 
-	-case		set to all lower case
-	-CASE		SET TO ALL UPPER CASE
-	-Case		Set to sentence case
-	-CaSe		SeT tO "RAnSom nOTe" CasE
+        -case           set to all lower case
+        -CASE           SET TO ALL UPPER CASE
+        -Case           Set to sentence case
+        -CaSe           SeT tO "RAnSom nOTe" CasE
 
-			[mutex: -case -CASE -Case -CaSe]
+                        [mutex: -case -CASE -Case -CaSe]
 
 The interaction of the C<[mutex:...]> and C<[required]> directives is
 potentially awkward in the case where two "required" arguments are
@@ -2572,12 +2641,12 @@ exclusive> appears on the command-line.
 
 Hence the specifications:
 
-	-case		set to all lower case      [required]
-	-CASE		SET TO ALL UPPER CASE      [required]
-	-Case		Set to sentence case       [required]
-	-CaSe		SeT tO "RAnSom nOTe" CasE  [required]
+        -case           set to all lower case      [required]
+        -CASE           SET TO ALL UPPER CASE      [required]
+        -Case           Set to sentence case       [required]
+        -CaSe           SeT tO "RAnSom nOTe" CasE  [required]
 
-			[mutex: -case -CASE -Case -CaSe]
+                        [mutex: -case -CASE -Case -CaSe]
 
 mean that I<exactly one> of these four flags must appear on the
 command-line, but that the presence of any one of them will suffice
@@ -2599,18 +2668,18 @@ mutual exclusion, specifying that the current parameter is mutually exclusive
 with all the other parameters lists, but those other parameters are not
 mutually exclusive with each other. That is, whereas the specification:
 
-	-left		Justify to left margin
-	-right		Justify to right margin
-	-centre		Centre each line
+        -left           Justify to left margin
+        -right          Justify to right margin
+        -centre         Centre each line
 
-	[mutex: -left -right -centre]
+        [mutex: -left -right -centre]
 
 means that only one of these three justification alternatives can ever be used
 at once, the specification:
 
-	-left		Justify to left margin   
-	-right		Justify to right margin 
-	-centre		Centre each line  [excludes: -left -right]
+        -left           Justify to left margin   
+        -right          Justify to right margin 
+        -centre         Centre each line  [excludes: -left -right]
 
 means that C<-left> and C<-right> can still be used together
 (probably to indicate "left I<and> right" justification), but that
@@ -2628,14 +2697,14 @@ command-line. The condition is a boolean expression, in which the
 terms are the flags or various parameters, and the operations are 
 C<&&>, C<||>, C<!>, and bracketting. For example, the specifications:
 
-	-num		Use numeric sort order
-	-lex		Use "dictionary" sort order
-	-len		Sort on length of line (or field)
+        -num            Use numeric sort order
+        -lex            Use "dictionary" sort order
+        -len            Sort on length of line (or field)
 
-	-field <N:+i>	Sort on value of field <N> 
+        -field <N:+i>   Sort on value of field <N> 
 
-	-rev		Reverse sort order
-			[requires: -num || -lex || !(-len && -field)]
+        -rev            Reverse sort order
+                        [requires: -num || -lex || !(-len && -field)]
 
 means that the C<-rev> flag is allowed only if either the C<-num> or the
 C<-lex> parameter has been used, or if it is not true that
@@ -2681,8 +2750,8 @@ L<"The Getopt::Declare::parse() method">.
 in which case C<Getopt::Declare::new()> immediately returns zero.
 This alternative is useful when using a C<FileHandle>:
 
-	my $args = new Getopt::Declare($grammar,
-				       new FileHandle ($filename) || -SKIP);
+        my $args = new Getopt::Declare($grammar,
+                                       new FileHandle ($filename) || -SKIP);
 
 because it makes explicit what happens if C<FileHandle::new()> fails. Of course,
 if the C<-SKIP> alternative were omitted, <Getopt::Declare::new> would
@@ -2734,29 +2803,29 @@ corresponding hash key is not a hash reference, but the actual value matched.
 
 The following example illustrates the various possibilities:
 
-	$args = new Getopt::Declare, q{
+        $args = new Getopt::Declare q{
 
-		-v <value> [etc]	One or more values
-		<infile>		Input file [required]
-		-o <outfiles>...	Output files
-	};
+                -v <value> [etc]        One or more values
+                <infile>                Input file [required]
+                -o <outfiles>...        Output files
+        };
 
-	if ( $args->{'-v'} )
-	{
-		print  "Using value: ", $args->{'-v'}{'<value>'};
-		print  " (et cetera)" if $args->{'-v'}{'etc'};
-		print  "\n";
-	}
+        if ( $args->{'-v'} )
+        {
+                print  "Using value: ", $args->{'-v'}{'<value>'};
+                print  " (et cetera)" if $args->{'-v'}{'etc'};
+                print  "\n";
+        }
 
-	open INFILE, $args->{'<infile>'} or die;
-	@data = <INFILE>;
+        open INFILE, $args->{'<infile>'} or die;
+        @data = <INFILE>;
 
-	foreach $outfile ( @{$args->{'-o'}{'<outfiles>'}} )
-	{
-		open  OUTFILE, ">$outfile"  or die;
-		print OUTFILE process(@data);
-		close OUTFILE;
-	}
+        foreach $outfile ( @{$args->{'-o'}{'<outfiles>'}} )
+        {
+                open  OUTFILE, ">$outfile"  or die;
+                print OUTFILE process(@data);
+                close OUTFILE;
+        }
 
 
 The values which are assigned to the various hash elements are copied from
@@ -2765,14 +2834,14 @@ actions. In particular, if the value of any of those block-scoped variables
 is changed within an action, that changed value is saved in the hash. For
 example, given the specification:
 
-	$args = new Getopt::Declare, q{
+        $args = new Getopt::Declare q{
 
-	-ar <R:n>	Set aspect ratio (will be clipped to [0..1])
-				{
-				  $R = 0 if $R < 0;
-				  $R = 1 if $R > 1;
-				}
-	};
+        -ar <R:n>       Set aspect ratio (will be clipped to [0..1])
+                                {
+                                  $R = 0 if $R < 0;
+                                  $R = 1 if $R > 1;
+                                }
+        };
 
 then the value of C<$args-E<gt>{'-ar'}{'E<lt>RE<gt>'}>
 will always be between zero and one.
@@ -2833,25 +2902,25 @@ parsed successfully. It returns a defined false (zero) if the source is
 not located. An C<undef> is returned if the source is located, but not
 successfully parsed.
 
-Thus, the following code first constructs a parsers for a series of alternate
+Thus, the following code first constructs a parser for a series of alternate
 configuration files and the command line, and then parses them:
 
-	# BUILD PARSERS
-	my $config  = Getopt::Declare::new($config_grammar, -BUILD);
-	my $cmdline = Getopt::Declare::new($cmdline_grammar, -BUILD);
+        # BUILD PARSERS
+        my $config  = Getopt::Declare::new($config_grammar, -BUILD);
+        my $cmdline = Getopt::Declare::new($cmdline_grammar, -BUILD);
 
-	# TRY STANDARD CONFIG FILES
-	$config->parse(-CONFIG)
+        # TRY STANDARD CONFIG FILES
+        $config->parse(-CONFIG)
 
-	# OTHERWISE, TRY GLOBAL CONFIG
-	or $config->parse('/usr/local/config/.demo_rc')
+        # OTHERWISE, TRY GLOBAL CONFIG
+        or $config->parse('/usr/local/config/.demo_rc')
 
-	# OTHERWISE, TRY OPENING A FILEHANDLE (OR JUST GIVE UP)
-	or $config->parse(new FileHandle (".config") || -SKIP);
+        # OTHERWISE, TRY OPENING A FILEHANDLE (OR JUST GIVE UP)
+        or $config->parse(new FileHandle (".config") || -SKIP);
 
-	# NOW PARSE THE COMMAND LINE
+        # NOW PARSE THE COMMAND LINE
 
-	$cmdline->parse() or die;
+        $cmdline->parse() or die;
 
 
 =item The C<Getopt::Declare::code()> method
@@ -2876,19 +2945,19 @@ For example, the following program "inlines" a C<Getopt::Declare>
 specification, by extracting it from between the first "=for
 Getopt::Declare" and the next "=cut" appearing on C<STDIN>:
 
-	use Getopt::Declare;
+        use Getopt::Declare;
 
-	sub encode { return new Getopt::Declare (shift,-BUILD)->code() || die }
+        sub encode { return new Getopt::Declare (shift,-BUILD)->code() || die }
 
-	undef $/;
-	if (<>)
-	{
-		s {^=for\s+Getopt::Declare\s*\n(.*?)\n=cut}
-		  {'my (\$self,$source) = ({});'.encode($1).' or die "\n";'}
-		  esm; 
-	}
+        undef $/;
+        if (<>)
+        {
+                s {^=for\s+Getopt::Declare\s*\n(.*?)\n=cut}
+                  {'my (\$self,$source) = ({});'.encode($1).' or die "\n";'}
+                  esm; 
+        }
 
-	print;
+        print;
 
 Note that the generated inlined version expects to find a lexical variable
 named C<$source>, which tells it what to parse (this variable is
@@ -2896,7 +2965,7 @@ normally set by the optional parameters of C<Getopt::Declare::new()> or
 C<Getopt::Declare::parse()>).
 
 The inlined code leaves all extracted parameters in the lexical
-variable C<$self> and the does not autogenerate help or version flags
+variable C<$self> and does not autogenerate help or version flags
 (since there is no actual F<Getopt::Declare> object in the inlined code
 through which to generate them).
 
@@ -2916,17 +2985,17 @@ the help parameter (see L<"Help parameters">) or by explicitly calling
 the C<Getopt::Declare::usage()> method (through an action or after
 command-line processing):
 
-	$args = new Getopt::Declare, q{
+        $args = new Getopt::Declare q{
 
-		-usage		Show usage information and exit
-					{ $self->usage(0); }
+                -usage          Show usage information and exit
+                                        { $self->usage(0); }
 
-		+usage		Show usage information at end of program
-	};
+                +usage          Show usage information at end of program
+        };
 
-	# PROGRAM HERE 
+        # PROGRAM HERE 
 
-	$args->usage()  if $args->{'+usage'};
+        $args->usage()  if $args->{'+usage'};
 
 
 The following changes are made to the original specification before
@@ -2993,31 +3062,31 @@ decoration. In fact, there are only four actual parameters (C<-in>,
 C<-r>, C<-p>, and C<-out>) specified. Note in particular that I<leading> tabs
 are perfectly acceptible in decorator lines.
 
-	$args = new Getopt::Declare (<<'EOPARAM');
+        $args = new Getopt::Declare (<<'EOPARAM');
 
-	============================================================
-	Required parameter:
+        ============================================================
+        Required parameter:
 
-		-in <infile>		Input file [required]
+                -in <infile>            Input file [required]
 
-	------------------------------------------------------------
+        ------------------------------------------------------------
 
-	Optional parameters:
+        Optional parameters:
 
-		(The first two are mutually exclusive) [mutex: -r -p]
+                (The first two are mutually exclusive) [mutex: -r -p]
 
-		-r[and[om]]		Output in random order
-		-p[erm[ute]]		Output all permutations
+                -r[and[om]]             Output in random order
+                -p[erm[ute]]            Output all permutations
 
-		---------------------------------------------------
+                ---------------------------------------------------
 
-		-out <outfile>		Optional output file
+                -out <outfile>          Optional output file
 
-	------------------------------------------------------------
-	Note: this program is known to run very slowly of files with
-	      long individual lines.
-	============================================================
-	EOPARAM
+        ------------------------------------------------------------
+        Note: this program is known to run very slowly of files with
+              long individual lines.
+        ============================================================
+        EOPARAM
 
 
 =head2 Help parameters
@@ -3025,15 +3094,15 @@ are perfectly acceptible in decorator lines.
 By default, F<Getopt::Declare> automatically defines I<all> of the following
 parameters:
 
-	-help	Show usage information [undocumented]
-			{ $self->usage(0); }
-	-Help	[ditto]
-	-HELP	[ditto]
-	--help	[ditto]
-	--Help	[ditto]
-	--HELP	[ditto]
-	-h	[ditto]
-	-H	[ditto]
+        -help   Show usage information [undocumented]
+                        { $self->usage(0); }
+        -Help   [ditto]
+        -HELP   [ditto]
+        --help  [ditto]
+        --Help  [ditto]
+        --HELP  [ditto]
+        -h      [ditto]
+        -H      [ditto]
 
 Hence, most attempts by the user to get help will automatically work
 successfully.
@@ -3043,8 +3112,8 @@ explicitly specified in the string passed to C<Getopt::Declare::new()>,
 that flag (only) is removed from the list of possible help flags. For
 example:
 
-	-w <pixels:+i>	Specify width in pixels
-	-h <pixels:+i>	Specify height in pixels
+        -w <pixels:+i>  Specify width in pixels
+        -h <pixels:+i>  Specify height in pixels
 
 would cause the C<-h> help parameter to be removed (although help
 would still be accessible through the other seven alternatives).
@@ -3055,15 +3124,15 @@ would still be accessible through the other seven alternatives).
 F<Getopt::Declare> also automatically creates a set of parameters which can be
 used to retreive program version information:
 
-	-version	Show version information [undocumented]
-				{ $self->version(0); }
-	-Version	[ditto]
-	-VERSION	[ditto]
-	--version	[ditto]
-	--Version	[ditto]
-	--VERSION	[ditto]
-	-v		[ditto]
-	-V		[ditto]
+        -version        Show version information [undocumented]
+                                { $self->version(0); }
+        -Version        [ditto]
+        -VERSION        [ditto]
+        --version       [ditto]
+        --Version       [ditto]
+        --VERSION       [ditto]
+        -v              [ditto]
+        -V              [ditto]
 
 As with the various help commands, explicitly specifying a parameter
 with any of the above flags removes that flag from the list of version

@@ -1,8 +1,8 @@
 
 use ExtUtils::MakeMaker;
 WriteMakefile(
-		NAME	=> 'Getopt::Declare',
-		VERSION => '1.09',
+		NAME	=> q[Getopt::Declare],
+		VERSION => q[1.10],
                 PREREQ_PM => { 'Text::Balanced'=> 0 },
 
 	     );

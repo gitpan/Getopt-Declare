@@ -1,5 +1,5 @@
 ==============================================================================
-                  Release of version 1.09 of Getopt::Declare
+                  Release of version 1.10 of Getopt::Declare
 ==============================================================================
 
 
@@ -86,25 +86,36 @@ Note: requires the Text::Balanced module
 
 ==============================================================================
 
-CHANGES IN VERSION 1.09
+CHANGES IN VERSION 1.10
 
 
-	- Fixed bug with reject and finish -- was incorrectly rejecting
-	  :of on non-existent files (thanks Andrew and Deneb).
+	- Documented the gotcha of using tabs within a parameter specification
+	  (thanks Dave)
 
-	- Added used() and unused() method to retrieve used and unused args 
-	  (thanks Phil)
+	- Fixed subtle bug with multi-argument parameters (thanks Tim)
 
-	- Consolidated POD with .pm file
+	- Documented built-in :id and :qs parameter variable types (thanks Tim)
 
-	- Fixed bug where args with value 0 were ignored (thanks Dave)
+	- Allowed directives to take whitespace between opening [ and keyword
 
-	- Fixed overriding of version flags (thanks everyone)
+	- Fixed bug with /.../ patterns within [pvtype:...] directives
+	  (Thanks Tim)
 
-	- Cleaned up acceptance tests on typed params. No longer 
-	  complain if value omitted (thanks Duncan)
+	- Documented need to avoid capturing parens in [pvtype:...] directives
+	  (Thanks Tim)
 
-	- Improved error messages when an arg is rejected (thanks Duncan)
+	- Added \G to -v flag checker to solve nasty problem with embedded
+	  args containing -v
+
+	- Added ability to specify interface directly in use statement
+
+	- Changed matching of initial flags so that -p[rompt] and -p[rompt]2
+	  are seen as distinct
+
+	- Fixed doc nits (thanks Steven and Paul)
+
+	- Added AUTOLOAD to delegate embedded sub calls back to main 
+
 
 
 ==============================================================================
@@ -112,8 +123,5 @@ CHANGES IN VERSION 1.09
 AVAILABILITY
 
 Getopt::Declare has been uploaded to the CPAN
-and is also available from:
-
-	http://www.cs.monash.edu.au/~damian/CPAN/Getopt-Declare.tar.gz
 
 ==============================================================================
