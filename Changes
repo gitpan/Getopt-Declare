@@ -1,0 +1,26 @@
+Revision history for Perl extension Getopt::Declare.
+
+1.03	Thu Apr 30 19:51:27 1998
+
+	- first semi-public release
+
+
+1.04	Wed Jun 17 14:37:22 1998
+
+	- Extended -AWK grammar to recognize <var>=''
+
+	- Fixed code generator so that actions actually do
+	  execute in the caller's package, as documented.
+
+	- Changed 1st arg type of finish and reject to 
+	  simple scalar. Made arg optional (omitted -> true)
+
+	- Fixed handling of defer, reject and finish so that
+	  they work as expected
+
+
+1.05	Thu Aug 27 16:35:26 1998
+
+	- Added code to reset $_VAL_ each time a parameter matches
+
+	- Added a test.pl
