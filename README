@@ -1,5 +1,5 @@
 ==============================================================================
-                  Release of version 1.05 of Getopt::Declare
+                  Release of version 1.06 of Getopt::Declare
 ==============================================================================
 
 DESCRIPTION
@@ -40,7 +40,7 @@ The specification is a single string such as this:
 				    { $N = 1 unless defined $N; }
 
 	    --              Traditionally indicates end of arguments
-				    { finish {1} }
+				    { finish }
     );
 
 in which the syntax of each parameter is declared, along with a
@@ -85,12 +85,13 @@ Other features of the Getopt::Declare package include:
 
 ==============================================================================
 
-CHANGES IN VERSION 1.05
+CHANGES IN VERSION 1.06
 
 
-	- Added code to reset $_VAL_ each time a parameter matches
+	- Made detection of strictness more robust (in line with
+	  change (bug?) in list construction behaviour in 5.005_02)
 
-	- Added a test.pl
+	- Added workarounds for weird behaviour of pod2man
 
 
 ==============================================================================

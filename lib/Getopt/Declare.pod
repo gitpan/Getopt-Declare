@@ -1,13 +1,11 @@
 =head1 NAME
 
-Getopt::Declare -
-
-Declaratively Expressed Command-Line Arguments via Regular Expressions
+Getopt::Declare - Declaratively Expressed Command-Line Arguments via Regular Expressions
 
 =head1 VERSION
 
-This document describes version 1.05 of Getopt::Declare,
-released August 27, 1998.
+This document describes version 1.06 of Getopt::Declare,
+released November  2, 1998.
 
 =head1 SYNOPSIS
 
@@ -16,7 +14,7 @@ released August 27, 1998.
  $args = new Getopt::Declare ($specification_string, $optional_source);
 
 
-=head1 THE BASICS
+=head1 DESCRIPTION
 
 =head2 Overview
 
@@ -103,7 +101,7 @@ relationship will then be automatically enforced).
 =item *
 
 Intelligent clustering of adjacent flags (for example: the
-command-line sequence "-a -b -c" may be abbreviated to "-abc", unless
+command-line sequence "S<-a -b -c>" may be abbreviated to "-abc", unless
 there is also a C<-abc> flag declared).
 
 =item *
@@ -575,8 +573,8 @@ without regard for case. For example, the specification:
 
 	-v	Verbose mode
 
-means that the arguments "-q" and "-Q" will both match the C<-q> parameter, but
-that only "-v" (and I<not> "-V") will match the C<-v> parameter.
+means that the arguments "S<-q>" and "S<-Q>" will both match the C<-q> parameter, but
+that only "S<-v>" (and I<not> "S<-V>") will match the C<-v> parameter.
 
 If a C<[nocase]> directive appears anywhere I<outside> a parameter description,
 then the entire specification is declared case-insensitive and all parameters

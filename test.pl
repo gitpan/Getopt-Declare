@@ -9,9 +9,11 @@
 BEGIN { $| = 1; print "1..10\n"; }
 END {print "not ok 1\n" unless $loaded;}
 use Getopt::Declare;
-$loaded = 1;
+$::loaded = 1;
 print "ok 1\n";
-$count=2;
+my $count=2;
+
+use strict;
 
 sub ok
 {

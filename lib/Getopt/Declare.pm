@@ -4,7 +4,7 @@ use strict;
 use vars qw($VERSION);
 use UNIVERSAL qw(isa);
 
-$VERSION = '1.05';
+$VERSION = '1.06';
 
 
 package Getopt::Declare::StartOpt;
@@ -696,17 +696,18 @@ sub new		# ($self, $grammar; $source)
 		usage	=> $_grammar,
 		helppat => Getopt::Declare::Arg::helppat(),
 		verspat => Getopt::Declare::Arg::versionpat(),
-		strict	=> $_grammar =~ /\[strict\]/i,
+		strict	=> $_grammar =~ /\[strict\]/i||0,
 		clump	=> $clump,
 		source  => '',
 		'caller'  => scalar caller(),
 	}, ref($_class)||$_class;
 
+
 # VESTIGAL DEBUGGING CODE
 
-	 open (CODE, ">.CODE")
-	 	and print CODE $self->code($self->{'caller'})
-	 	and close CODE;
+	 # open (CODE, ">.CODE")
+	 # 	and print CODE $self->code($self->{'caller'})
+	 # 	and close CODE;
 
 # DO THE PARSE (IF APPROPRIATE)
 

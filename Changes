@@ -24,3 +24,11 @@ Revision history for Perl extension Getopt::Declare.
 	- Added code to reset $_VAL_ each time a parameter matches
 
 	- Added a test.pl
+
+
+1.06	Mon Nov  2 06:21:38 1998
+
+	- Made detection of strictness more robust (in line with
+	  change (bug?) in list construction behaviour in 5.005_02)
+
+	- Added workarounds for weird behaviour of pod2man
