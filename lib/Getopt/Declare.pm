@@ -4,7 +4,7 @@ use strict;
 use vars qw($VERSION);
 use UNIVERSAL qw(isa);
 
-$VERSION = '1.06';
+$VERSION = '1.07';
 
 
 package Getopt::Declare::StartOpt;
@@ -386,7 +386,7 @@ sub code
 
 	my $code = "\n";
 	my $flag = $self->{flag};
-	my $clump = $owner->{clump};
+	my $clump = $owner->{_internal}{clump};
 	my $i = 0;
 	my $nocase = (Getopt::Declare::_nocase() || $self->{nocase} ? 'i' : '');
 
@@ -488,8 +488,8 @@ sub code
 		else
 		{
 			foreach (#
-			. ($owner->{mutex}{$flag}
-			    ? join(',', map {"'$_'"} @{$owner->{mutex}{$flag}})
+			. ($owner->{_internal}{mutex}{$flag}
+			    ? join(',', map {"'$_'"} @{$owner->{_internal}{mutex}{$flag}})
 			    : '()')
 			. q#)
 			{
@@ -580,6 +580,7 @@ sub new		# ($self, $grammar; $source)
 	my @_args = ();
 	my $_mutex = {};
 	my $_action;
+	my $_strict = 0;
 	my $_all_repeatable = 0;
 	my $_lastdesc = undef;
 	_nocase(0);
@@ -632,6 +633,7 @@ sub new		# ($self, $grammar; $source)
 			my $spec = $1;
 			my $desc = $2;
 			my $ditto;
+			$_strict ||= $desc =~ /\Q[strict]/;
 
 			$desc .= $1 while s/\A((?![ 	]*({|\n)|.*?\S.*?\t.*?\S).*?\S.*\n)//;
 			
@@ -651,6 +653,7 @@ sub new		# ($self, $grammar; $source)
 
 		s/((?:(?!\[pvtype:).)*)(\n|(?=\[pvtype:))//;
 		my $decorator = $1;
+		$_strict ||= $decorator =~ /\Q[strict]/;
 		_infer($decorator, undef, $_mutex);
 		$_all_repeatable = 1 if $decorator =~ /\[repeatable\]/;
 	}
@@ -691,23 +694,26 @@ sub new		# ($self, $grammar; $source)
 
 	my $self = bless
 	{
-		args	=> [@_args],
-		mutex	=> $_mutex,
-		usage	=> $_grammar,
-		helppat => Getopt::Declare::Arg::helppat(),
-		verspat => Getopt::Declare::Arg::versionpat(),
-		strict	=> $_grammar =~ /\[strict\]/i||0,
-		clump	=> $clump,
-		source  => '',
-		'caller'  => scalar caller(),
+		_internal =>
+		{
+			args	=> [@_args],
+			mutex	=> $_mutex,
+			usage	=> $_grammar,
+			helppat => Getopt::Declare::Arg::helppat(),
+			verspat => Getopt::Declare::Arg::versionpat(),
+			strict	=> $_strict,
+			clump	=> $clump,
+			source  => '',
+			'caller'  => scalar caller(),
+		}
 	}, ref($_class)||$_class;
 
 
 # VESTIGAL DEBUGGING CODE
 
-	 # open (CODE, ">.CODE")
-	 # 	and print CODE $self->code($self->{'caller'})
-	 # 	and close CODE;
+	 open (CODE, ">.CODE")
+	 	and print CODE $self->code($self->{_internal}{'caller'})
+	 	and close CODE;
 
 # DO THE PARSE (IF APPROPRIATE)
 
@@ -834,9 +840,9 @@ sub parse	# ($self;$source)
 		$source = '';
 	}
 
-	$self->{source} = $source;
+	$self->{_internal}{source} = $source;
 	
-	if (!eval $self->code($self->{'caller'}))
+	if (!eval $self->code($self->{_internal}{'caller'}))
 	{
 		die "Error: in generated parser code:\n$@\n"
 			if $@;
@@ -929,14 +935,21 @@ sub _typedef
 	Getopt::Declare::ScalarArg::addtype($name,$pat,$action,$ind=~/:/);
 }
 
-sub _ditto	# ($original, $desc)
+sub _ditto	# ($originalflag, $orginaldesc, $extra)
 {
-	my ($original, $extra) = @_;
-	chomp $original;
-	$original =~ s/\S/"/g;
-	1 while $original =~ s/"("+)"/ $1 /g;
-	$original =~ s/""/" /g;
-	return "$original$extra\n";
+	my ($originalflag, $originaldesc, $extra) = @_;
+	if ($originaldesc =~ /\n.*\n/)
+	{
+		$originaldesc = "Same as $originalflag ";
+	}
+	else
+	{
+		chomp $originaldesc;
+		$originaldesc =~ s/\S/"/g;
+		1 while $originaldesc =~ s/"("+)"/ $1 /g;
+		$originaldesc =~ s/""/" /g;
+	}
+	return "$originaldesc$extra\n";
 }
 
 sub _mutex	# (\%mutex, @list)
@@ -981,8 +994,9 @@ sub version
 sub usage
 {
 	my $self = $_[0];
-	local $_ = $self->{usage};
+	local $_ = $self->{_internal}{usage};
 	
+	my $lastflag = undef;
 	my $lastdesc = undef;
 
 	my $usage = '';
@@ -1028,11 +1042,12 @@ sub usage
 			$desc =~ s/\[.*?\]//g;
 
 			if ($ditto)
-				{ $desc = ($lastdesc? _ditto($lastdesc,$desc) : "" ) }
+				{ $desc = ($lastdesc? _ditto($lastflag,$lastdesc,$desc) : "" ) }
 			elsif ($desc =~ /\A\s*\Z/)
 				{ next; }
 			else
 				{ $lastdesc = $desc; }
+			$spec =~ /\A\s*(\S+)/ and $lastflag = $1;
 
 			$usage .= $spec . ' ' x $uoff . $desc;
 
@@ -1054,7 +1069,7 @@ sub usage
 
 	my $required = '';
 
-	foreach my $arg ( @{$self->{args}} )
+	foreach my $arg ( @{$self->{_internal}{args}} )
 	{
 		if ($arg->{required})
 		{
@@ -1076,7 +1091,7 @@ sub usage
 		$PAGER = new IO::Pager ( resume => 1 );
 	}
 
-	unless ($self->{source})
+	unless ($self->{_internal}{source})
 	{
 		print $PAGER  "\nUsage: $0 [options] $required\n";
 		print $PAGER  "       $0 $helpcmd\n" if $helpcmd;
@@ -1129,7 +1144,7 @@ sub code
 	  arg: while (!$_finished)
 	  {
 		$_errormsg = '';
-		# . ( $self->{clump} ? q#
+		# . ( $self->{_internal}{clump} ? q#
 		while ($_lastprefix)
 		{
 			my $substr = substr($_args,$_nextpos);
@@ -1146,12 +1161,12 @@ sub code
 		# : '') . q#
 		pos $_args = $_nextpos if defined $_args;
 
-		$self->usage(0) if $_args && $_args =~ m/\G# . $self->{helppat} . q#(\s|\0)/g;
-		$self->version(0) if $_args && $_args =~ m/# . $self->{verspat} . q#(\s|\0)/;
+		$self->usage(0) if $_args && $_args =~ m/\G(# . $self->{_internal}{helppat} . q#)(\s|\0|\Z)/g;
+		$self->version(0) if $_args && $_args =~ m/(# . $self->{_internal}{verspat} . q#)(\s|\0|\Z)/;
 
 	#;
 
-	foreach my $arg ( @{$self->{args}} )
+	foreach my $arg ( @{$self->{_internal}{args}} )
 	{
 		$code .= $arg->code($self,$package);
 	}
@@ -1168,7 +1183,7 @@ sub code
 	  pos $_args = $_nextpos;
 	  $_args && $_args =~ m/\G(?:\s|\0)*(\S+)/g or last;
 	  push @_unused, $1;
-	  if ($_errormsg) { print STDERR "Error"."$self->{source}: $_errormsg\n" }
+	  if ($_errormsg) { print STDERR "Error"."$self->{_internal}{source}: $_errormsg\n" }
 
 	  $_errors++ if ($_errormsg);
 	  }
@@ -1185,15 +1200,15 @@ sub code
 	  }
 	  #;
 
-	foreach my $arg ( @{$self->{args}} )
+	foreach my $arg ( @{$self->{_internal}{args}} )
 	{
 		next unless $arg->{required};
 		$code .= q#
-	  do { print STDERR "Error"."$self->{source}".': required parameter # . $arg->name . q# not found.',"\n"; $_errors++ }
+	  do { print STDERR "Error"."$self->{_internal}{source}".': required parameter # . $arg->name . q# not found.',"\n"; $_errors++ }
 		unless $_FOUND_{'# . $arg->name . q#'}#;
-		if ($self->{mutex}{$arg->name})
+		if ($self->{_internal}{mutex}{$arg->name})
 		{
-			foreach my $mutex (@{$self->{mutex}{$arg->name}})
+			foreach my $mutex (@{$self->{_internal}{mutex}{$arg->name}})
 			{
 				$code .= q# or $_FOUND_{'# . $mutex . q#'}#;
 			}
@@ -1201,12 +1216,12 @@ sub code
 		$code .= ';';
 	}
 	
-	foreach my $arg ( @{$self->{args}} )
+	foreach my $arg ( @{$self->{_internal}{args}} )
 	{
 		if ($arg->{requires})
 		{
 			$code .= q#
-	  do { print STDERR q|Error|.$self->{source}.q|: parameter '# . $arg->name
+	  do { print STDERR q|Error|.$self->{_internal}{source}.q|: parameter '# . $arg->name
 		  . q#' can only be specified with '# . _enbool($arg->{requires})
 		  . q#'|,"\n"; $_errors++ }
 		if $_FOUND_{'# . $arg->name . "'} && !(" . _enfound($arg->{requires}) . ');'
@@ -1218,7 +1233,7 @@ sub code
 			if $_args && $_nextpos && length($_args) >= $_nextpos;
 		#;
 
-	if ($self->{strict})
+	if ($self->{_internal}{strict})
 	{
 		$code .= q#
 		unless ($_nextpos < length($_args||''))
@@ -1226,7 +1241,7 @@ sub code
 			foreach (@_unused)
 			{
 				tr/\0/ /;
-				print STDERR "Error"."$self->{source}: unrecognizable argument ('$_')\n";
+				print STDERR "Error"."$self->{_internal}{source}: unrecognizable argument ('$_')\n";
 				$_errors++;
 			}
 		}
@@ -1235,13 +1250,13 @@ sub code
 
 	$code .= q#
 
-	  if ($_errors && !$self->{source})
+	  if ($_errors && !$self->{_internal}{source})
 	  {
 		print STDERR "\n(try '$0 ".'# . Getopt::Declare::Arg::besthelp
 				. q#'."' for more information)\n";
 	  }
 
-	  unless ($self->{source})
+	  unless ($self->{_internal}{source})
 	  {
 		  @ARGV = ();
 		  foreach ( @_unused ) { tr/\0/ /; push @ARGV, $_; }

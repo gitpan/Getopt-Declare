@@ -32,3 +32,20 @@ Revision history for Perl extension Getopt::Declare.
 	  change (bug?) in list construction behaviour in 5.005_02)
 
 	- Added workarounds for weird behaviour of pod2man
+
+
+1.07	Tue Mar 23 16:25:20 1999
+
+	- Changed behaviour of [ditto] when ditto'ing multiline
+	  descriptions (now prints: "Same as <prevflag>" instead)
+
+	- Fixed bug in handling of version flag (which made every
+	  argument beginning with -v... into a version flag)
+
+	- Shifted all internal entries of the Getopt::Declare hash
+	  into an anonymous hash in the entry "_internal".
+
+	- Patched the Makefile.PL to note dependencies (thanks Roland)
+
+	- Altered parsing of [strict] so that it's ignored when 
+	  commented out.

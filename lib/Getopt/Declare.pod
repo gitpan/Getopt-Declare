@@ -4,8 +4,8 @@ Getopt::Declare - Declaratively Expressed Command-Line Arguments via Regular Exp
 
 =head1 VERSION
 
-This document describes version 1.06 of Getopt::Declare,
-released November  2, 1998.
+This document describes version 1.07 of Getopt::Declare,
+released March 23, 1999.
 
 =head1 SYNOPSIS
 

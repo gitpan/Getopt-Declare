@@ -1,5 +1,5 @@
 ==============================================================================
-                  Release of version 1.06 of Getopt::Declare
+                  Release of version 1.07 of Getopt::Declare
 ==============================================================================
 
 DESCRIPTION
@@ -85,13 +85,22 @@ Other features of the Getopt::Declare package include:
 
 ==============================================================================
 
-CHANGES IN VERSION 1.06
+CHANGES IN VERSION 1.07
 
 
-	- Made detection of strictness more robust (in line with
-	  change (bug?) in list construction behaviour in 5.005_02)
+	- Changed behaviour of [ditto] when ditto'ing multiline
+	  descriptions (now prints: "Same as <prevflag>" instead)
 
-	- Added workarounds for weird behaviour of pod2man
+	- Fixed bug in handling of version flag (which made every
+	  argument beginning with -v... into a version flag)
+
+	- Shifted all internal entries of the Getopt::Declare hash
+	  into an anonymous hash in the entry "_internal".
+
+	- Patched the Makefile.PL to note dependencies (thanks Roland)
+
+	- Altered parsing of [strict] so that it's ignored when 
+	  commented out.
 
 
 ==============================================================================

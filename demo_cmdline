@@ -48,6 +48,7 @@ File creation options:
 				{ print "create: $file\n"; }
 
 	+d <file>	Duplicate file [implies: -a and -b 8]
+			This is a second line
 				{ print "dup (+d) $file\n"; }
 	--dup <file>	[ditto] (long form)
 #				{ print "dup (--dup) $file\n"; }
