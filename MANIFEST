@@ -6,5 +6,4 @@ demo_interp
 demo_shell
 demo_cmdline
 lib/Getopt/Declare.pm
-lib/Getopt/Declare.pod
 test.pl

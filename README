@@ -1,8 +1,7 @@
 ==============================================================================
-                  Release of version 1.08 of Getopt::Declare
+                  Release of version 1.09 of Getopt::Declare
 ==============================================================================
 
-DESCRIPTION
 
 Getopt::Declare is *yet another* command-line argument parser, one which
 is specifically designed to be powerful but exceptionally easy to use.
@@ -87,19 +86,25 @@ Note: requires the Text::Balanced module
 
 ==============================================================================
 
-CHANGES IN VERSION 1.08
+CHANGES IN VERSION 1.09
 
 
-	- Now only generates .CODE file if $::Declare_debug is true
+	- Fixed bug with reject and finish -- was incorrectly rejecting
+	  :of on non-existent files (thanks Andrew and Deneb).
 
-	- Added Text::Balanced as PREREQ to Makefile.PL
+	- Added used() and unused() method to retrieve used and unused args 
+	  (thanks Phil)
 
-	- Moved mutex test earlier in parameter parsing to
-	  correct an error that caused mutexing to be ignored
-	  (thanks Eric)
+	- Consolidated POD with .pm file
 
-	- Fixed hanging when last line was non-NL-terminated
-	  (thanks David)
+	- Fixed bug where args with value 0 were ignored (thanks Dave)
+
+	- Fixed overriding of version flags (thanks everyone)
+
+	- Cleaned up acceptance tests on typed params. No longer 
+	  complain if value omitted (thanks Duncan)
+
+	- Improved error messages when an arg is rejected (thanks Duncan)
 
 
 ==============================================================================

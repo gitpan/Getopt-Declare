@@ -63,3 +63,23 @@ Revision history for Perl extension Getopt::Declare.
 
 	- Fixed hanging when last line was non-NL-terminated
 	  (thanks David)
+
+
+1.09	Fri Sep 14 16:35:08 2001
+
+	- Fixed bug with reject and finish -- was incorrectly rejecting
+	  :of on non-existent files (thanks Andrew and Deneb).
+
+	- Added used() and unused() method to retrieve used and unused args 
+	  (thanks Phil)
+
+	- Consolidated POD with .pm file
+
+	- Fixed bug where args with value 0 were ignored (thanks Dave)
+
+	- Fixed overriding of version flags (thanks everyone)
+
+	- Cleaned up acceptance tests on typed params. No longer 
+	  complain if value omitted (thanks Duncan)
+
+	- Improved error messages when an arg is rejected (thanks Duncan)
