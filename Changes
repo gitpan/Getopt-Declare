@@ -119,3 +119,18 @@ Revision history for Perl extension Getopt::Declare.
 1.11	Tue Feb  3 20:44:26 2004
 
 	- Fixed bug in multi-argument parameters
+
+
+1.12	Tue Sep  2 14:15:01 2009
+
+	- Fixed bug #18084: Misparsing of numbers in exponential notation.
+
+	- Fixed bug in which only the first part of an number (:i or :n) needed
+	  to be a number (e.g. '123asdf' was parsed as '123').
+
+	- Fixed bug #41043: Misparsing of lists of files (:if or :of).
+
+	- Fixed bug causing misparsing of lists of quoted strings (:qs).
+
+	- Added emphasis in the documentation on the need for tabs in the
+	  specification

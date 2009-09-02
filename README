@@ -1,5 +1,5 @@
 ==============================================================================
-                  Release of version 1.11 of Getopt::Declare
+                  Release of version 1.12 of Getopt::Declare
 ==============================================================================
 
 
@@ -86,10 +86,10 @@ Note: requires the Text::Balanced module
 
 ==============================================================================
 
-CHANGES IN VERSION 1.11
+CHANGES IN VERSION 1.12
 
 
-	- Fixed bug in multi-argument parameters
+	- Bug fixes for parsing decimal numbers and lists of files
 
 
 ==============================================================================

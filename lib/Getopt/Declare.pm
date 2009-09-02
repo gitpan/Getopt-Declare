@@ -5,7 +5,7 @@ use vars qw($VERSION);
 use UNIVERSAL qw(isa);
 use Carp;
 
-$VERSION = '1.11';
+$VERSION = '1.12';
 
 sub import {
 	my ($class, $defn) = @_;
@@ -48,34 +48,28 @@ sub _reset_stdtype
 {
 	%stdtype = 
 	(
-		':i'	=> { pattern => '(?:(?:%T[+-]?)%D+)' },
-		':n'	=> { pattern => '(?:(?:%T[+-]?)(?:%D+(?:%T\.%D*)?(?:%T[eE]%D+)?'
-					. '|%T\.%D+(?:%T[eE]%D+)?))' },
+		':i'	=> { pattern => '(?:(?:%T[+-]?)%D+)(?=\s|\0|\z)' },
+		':n'	=> { pattern => '(?:(?:%T[+-]?)(?:%D+(?:%T\.%D*)?(?:%T[eE][+-]?%D+)?|%T\.%D+(?:%T[eE][+-]?%D+)?))(?=\s|\0|\z)' },
 		':s'	=> { pattern => '(?:%T(?:\S|\0))+(?=\s|\0|\z)' },
-		':qs'	=> { pattern => q{"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|(?:%T(?:\S|\0))+(?=\s|\0|\z)} },
+		':qs'	=> { pattern => q{(?:"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|(?:%T(?:\S|\0))+)(?=\s|\0|\z)} },
 		':id'	=> { pattern => '%T[a-zA-Z_](?:%T\w)*(?=\s|\0|\z)' },
-		':if'	=> { pattern => '%F(?:%T(?:\S|\0))+(?=\s|\0|\z)',
-			     action => '{reject(!defined $_VAL_ || $_VAL_ ne "-" && ! -r $_VAL_, "in parameter \'$_PARAM_\' (file \"$_VAL_\" is not readable)")}' },
-		':of'	=> { pattern => '%F(?:%T(?:\S|\0))+(?=\s|\0|\z)',
+		':if'	=> { pattern => '(?:%T(?:\S|\0))+(?=\s|\0|\z)',
+			     action => '{reject (!defined $_VAL_ || $_VAL_ ne "-" && ! -r $_VAL_, "in parameter \'$_PARAM_\' (file \"$_VAL_\" is not readable)")}' },
+		':of'	=> { pattern => '(?:%T(?:\S|\0))+(?=\s|\0|\z)',
 			     action => '{reject (!defined $_VAL_ || $_VAL_ ne "-" && -e $_VAL_ && ! -w $_VAL_ , "in parameter \'$_PARAM_\' (file \"$_VAL_\" is not writable)")}' },
 		''	=> { pattern => ':s', ind => 1 },
-
 		':+i'	=> { pattern => ':i',
 			     action => '{reject (!defined $_VAL_ || $_VAL_<=0, "in parameter \'$_PARAM_\' ($_VAR_ must be an integer greater than zero)")}',
 			     ind => 1},
-
 		':+n'	=> { pattern => ':n',
 			     action => '{reject (!defined $_VAL_ || $_VAL_<=0, "in parameter \'$_PARAM_\' ($_VAR_ must be a number greater than zero)")}',
 			     ind => 1},
-
 		':0+i'	=> { pattern => ':i',
 			     action => '{reject (!defined $_VAL_ || $_VAL_<0, "in parameter \'$_PARAM_\' ($_VAR_ must be an positive integer)")}',
 			     ind => 1},
-
 		':0+n'	=> { pattern => ':n',
 			     action => '{reject (!defined $_VAL_ || $_VAL_<0, "in parameter \'$_PARAM_\' ($_VAR_ must be a positive number)")}',
 			     ind => 1},
-
 	);
 }
 
@@ -131,10 +125,10 @@ sub new		# ($self, $name, $type, $nows)
 sub matcher	# ($self, $trailing)
 {
 	my ($self, $trailing) = @_;
+
 	#WAS: $trailing = $trailing ? '(?!\Q'.$trailing.'\E)' : '';
 	$trailing = $trailing ? '(?!'.quotemeta($trailing).')' : '';
 	my $stdtype = stdtype($self->{type});
-
 	if (!$stdtype && $self->{type} =~ m#\A:/([^/]+)/\Z#) { $stdtype = $1; }
 	if (!$stdtype)
 	{
@@ -146,6 +140,8 @@ sub matcher	# ($self, $trailing)
 	{
 		$stdtype = Getopt::Declare::Arg::negflagpat().$stdtype;
 	}
+	$stdtype = Getopt::Declare::Arg::negflagpat().$stdtype;
+
 	return "(?:$stdtype)";
 }
 
@@ -178,7 +174,7 @@ sub cachecode	# ($self, $ownerflag, $itemcount)
 
 sub trailer { '' };	# MEANS TRAILING PARAMETER VARIABLE
 
-sub ows	      
+sub ows
 {
 	return '[\s\0]*('.$_[1].')' unless $_[0]->{nows};
 	return '('.$_[1].')';
@@ -195,7 +191,6 @@ sub matcher	# ($self, $trailing)
 	my ($self, $trailing) = @_;
 	my $suffix = (defined $trailing && !$trailing) ? '([\s\0]+)' : '';
 	my $scalar = $self->SUPER::matcher($trailing);
-
 	return $scalar.'(?:[\s\0]+'.$scalar.')*'.$suffix;
 }
 
@@ -204,9 +199,7 @@ sub code	# ($self, $pos, $package)
 	my $code = '
 		$_VAR_ = q|<' . $_[0]->{name} . '>|;
 		$_VAL_ = undef;
-		my @' . $_[0]->{name} . ' =
-			map { tr/\0/ /; $_ } split " ", $'.($_[1]+1)."||'';\n";
-
+		my @' . $_[0]->{name} . ' = map { tr/\0/ /; $_ } split " ", $'.($_[1]+1)."||'';\n";
 
 	my @actions = Getopt::Declare::ScalarArg::stdactions($_[0]->{type});
 	if (@actions)
@@ -217,7 +210,7 @@ sub code	# ($self, $pos, $package)
 		foreach ( @actions )
 		{
 			s/(\s*\{)/$1 package $_[2]; /;
-			$code .= "\t\t\tdo $_;\n";
+			$code .= "\n\t\t\tdo $_;\n";
 		}
 		$code .= '
 		}';
@@ -265,7 +258,7 @@ sub cachecode	# ($self, $ownerflag, $itemcount)
 
 sub trailer  { $_[0]->{text} };
 
-sub ows	      
+sub ows
 {
 	return '[\s\0]*('.$_[1].')' unless $_[0]->{nows};
 	return '('.$_[1].')';
@@ -463,15 +456,11 @@ sub code
 
 	if (@{$self->{args}})
 	{
-		$code .= '
-			$_args && $_args =~ m/\G';
-
+		$code .= "\t\t".'$_args && $_args =~ m/\G';
 		for ($i=0; $i < @{$self->{args}} ; $i++ )
 		{
-		    $code .=
-			$self->{args}[$i]->ows($self->{args}[$i]->matcher($trailer[$i]))
+		    $code .= $self->{args}[$i]->ows($self->{args}[$i]->matcher($trailer[$i]));
 		}
-
 		$code .= '/gx' . $nocase . ' or last;'
 	}
 
@@ -740,13 +729,12 @@ sub new		# ($self, $grammar; $source)
 
 # VESTIGAL DEBUGGING CODE
 
-	 open (CODE, ">.CODE")
-	 	and print CODE $self->code($self->{_internal}{'caller'})
-	 	and close CODE 
+	open (CODE, ">.CODE")
+		and print CODE $self->code($self->{_internal}{'caller'})
+		and close CODE
 			if $::Declare_debug;
 
 # DO THE PARSE (IF APPROPRIATE)
-
 
 	if (@_==3) { return undef unless defined $self->parse($_[2]) }
 	else	   { return undef unless defined $self->parse(); }
@@ -786,7 +774,7 @@ sub parse	# ($self;$source)
 	my ( $self, $source ) = @_;
 	my $_args = ();
 	my $_get_nextline = sub { undef };
-	if (@_>1)
+	if (@_>1) # if $source was provided
 	{
 		if (!defined $source)
 		{
@@ -863,9 +851,12 @@ sub parse	# ($self;$source)
 		return 0 unless defined $_args;
 		$source = " (in $source)";
 	}
-	else
+	else # $source was NOT provided
 	{
-		foreach (@ARGV) { $_ =~ tr/ \t\n/\0\0\0/; }
+		foreach (@ARGV) {
+			# Clean entries: remove spaces, tabs and newlines
+			$_ =~ tr/ \t\n/\0\0\0/;
+		}
 		$_args = join(' ', @ARGV);
 		$source = '';
 	}
@@ -1166,6 +1157,7 @@ sub code
 {
 	my $self = shift;
 	my $package = shift||'main';
+
 	my $code = q#
 
 	do
@@ -1228,7 +1220,7 @@ sub code
 	{
 		$code .= $arg->code($self,$package);
 	}
-	
+
 	$code .= q#
 
 	  if ($_lastprefix)
@@ -1324,6 +1316,7 @@ sub code
 
 	}
 	#;
+
 }
 
 1;
@@ -1335,8 +1328,8 @@ Getopt::Declare - Declaratively Expressed Command-Line Arguments via Regular Exp
 
 =head1 VERSION
 
-This document describes version 1.11 of Getopt::Declare,
-released Feb 4, 2003
+This document describes version 1.12 of Getopt::Declare,
+released Sept 2, 2009
 
 =head1 SYNOPSIS
 
@@ -1398,11 +1391,14 @@ The specification is a single string such as this:
 					{ finish }
 	);
 
-in which the syntax of each parameter is declared, along with a
-description and (optionally) one or more actions to be performed when
-the parameter is encountered. The specification string may also
-include other usage formatting information (such as group headings or
-separators) as well as standard Perl comments (which are ignored).
+B<Note that in each of the cases above, there is a tab between each
+parameter definition and description (even if you can't see it)!>
+In the specification, the syntax of each parameter is declared,
+along with a description and (optionally) one or more actions to
+be performed when the parameter is encountered. The specification
+string may also include other usage formatting information (such
+as group headings or separators) as well as standard Perl comments
+(which are ignored).
 
 Calling C<Getopt::Delare::new()> parses the contents of the array C<@ARGV>,
 extracting any arguments which match the parameters defined in the
@@ -1579,8 +1575,8 @@ definitions:
 	ignore bad lines		
 	<outfile>				
 
-Note that each of the above examples has at least one trailing tab
-(even if you can't see them). Note too that this hodge-podge of
+B<Note that each of the above examples has at least one trailing tab
+(even if you can't see them)!>. Note too that this hodge-podge of
 parameter styles is certainly not recommended within a single program,
 but is shown so as to illustrate some of the range of parameter syntax
 conventions F<Getopt::Declare> supports.
@@ -2028,29 +2024,29 @@ integers (that is: 1, 2, 3, etc.)
 which restricts a parameter variable to matching positive, non-zero
 numbers (that is, floating point numbers strictly greater than zero).
 
-=item :0+i  
+=item :0+i 
 
 which restricts a parameter variable to matching non-negative integers (that
 is: 0, 1, 2, 3, etc.)
 
-=item :0+n  
+=item :0+n
 
 which restricts a parameter variable to matching non-negative numbers (that
 is, floating point numbers greater than or equal to zero).
 
-=item :qs  
+=item :qs
 
 which allows a parameter variable to match any quote-delimited or
 whitespace-terminated string. Note that this specifier simply makes
 explicit the default behaviour.
 
-=item :id  
+=item :id
 
 which allows a parameter variable to match any identifier
 sequence. That is: a alphabetic or underscore, followed by
 zero-or-more alphanumerics or underscores.
 
-=item :if  
+=item :if
 
 which is used to match input file names. Like type ':s', type ':if'
 matches any quote-delimited or whitespace-terminated string. However
@@ -2058,13 +2054,13 @@ this type does I<not> respect other command-line flags and also
 requires that the matched string is either "-" (indicating standard
 input) or the name of a readable file.
 
-=item :of  
+=item :of
 
 which is used to match output file names. It is exactly like type ':if' except
 that it requires that the string is either "-" (indicating standard output)
 or the name of a file that is either writable or non-existent.
 
-=item :s  
+=item :s
 
 which allows a parameter variable to match any quote-delimited or
 whitespace-terminated string. Note that this specifier simply makes
@@ -2120,9 +2116,8 @@ By default, any explicit pattern is modified by F<Getopt::Declare>
 so that it fails if the argument being matched represents some defined
 parameter flag. If however the sequence C<%F> appears anywhere in a
 pattern, it causes the pattern I<not> to reject strings which would
-otherwise match another flag. For example, the inbuilt types ':if' and
-':of' use C<%F> to enable them to match filenames which happen to be
-identical to parameter flags.
+otherwise match another flag. By default, no inbuilt type allows
+arguments to match a flag.
 
 =back
 
