@@ -1,9 +1,11 @@
 Changes
-MANIFEST
-Makefile.PL
-demo_csv
-demo_interp
-demo_shell
-demo_cmdline
+demos/demo_cmdline
+demos/demo_csv
+demos/demo_interp
+demos/demo_shell
 lib/Getopt/Declare.pm
-test.pl
+Makefile.PL
+MANIFEST
+README
+t/test.t
+META.yml                                 Module meta-data (added by MakeMaker)

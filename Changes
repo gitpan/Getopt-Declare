@@ -115,7 +115,6 @@ Revision history for Perl extension Getopt::Declare.
 	- Added AUTOLOAD to delegate embedded sub calls back to main 
 
 
-
 1.11	Tue Feb  3 20:44:26 2004
 
 	- Fixed bug in multi-argument parameters
@@ -134,3 +133,11 @@ Revision history for Perl extension Getopt::Declare.
 
 	- Added emphasis in the documentation on the need for tabs in the
 	  specification
+
+
+1.13	Sun Mar 28 16:35:18 2010
+
+	- Fixed the support for IO::Pager
+
+  - Improved unit testing with Test::More
+

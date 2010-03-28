@@ -5,7 +5,7 @@ use vars qw($VERSION);
 use UNIVERSAL qw(isa);
 use Carp;
 
-$VERSION = '1.12';
+$VERSION = '1.13';
 
 sub import {
 	my ($class, $defn) = @_;
@@ -1005,16 +1005,37 @@ sub _exclude	# (\%mutex, $excluded, @list)
 
 sub version
 {
+	my ($self, $exit_status) = @_;
 	# my $filedate = localtime(time - 86400 * -M $0);
 	my $filedate = localtime((stat $0)[9]);
 	if ($::VERSION) { print "\n\t$0: version $::VERSION  ($filedate)\n\n" }
-	else		{ print "\n\t$0: version dated $filedate\n\n" }
-	exit $_[1] if defined $_[1];
+	else { print "\n\t$0: version dated $filedate\n\n" }
+	exit $exit_status if defined $exit_status;
+  return 1;
 }
 
 sub usage
 {
-	my $self = $_[0];
+	my ($self, $exit_status) = @_;
+	if (eval { require IO::Pager })
+	{
+		new IO::Pager; # use a pager for all print() statements
+	}
+	print $self->usage_string;
+	if (eval { require IO::Pager })
+	{
+		close; # done using the pager
+	}
+	if (defined $exit_status)
+	{
+		exit $exit_status;
+	}
+	return 1;
+}
+
+sub usage_string
+{
+	my $self = shift;
 	local $_ = $self->{_internal}{usage};
 	
 	my $lastflag = undef;
@@ -1075,7 +1096,6 @@ sub usage
 			next;
 		};
 
-
 	# OTHERWISE, DECORATION
 		if (s/((?:(?!\[\s*pvtype:).)*)(\n|(?=\[\s*pvtype:))//)
 		{
@@ -1105,24 +1125,17 @@ sub usage
 	my $helpcmd = Getopt::Declare::Arg::besthelp;
 	my $versioncmd = Getopt::Declare::Arg::bestversion;
 
-	my $PAGER = \*STDOUT;
-
-	if (eval { require IO::Pager })
+  my $msg = '';
+  unless ($self->{_internal}{source})
 	{
-		$PAGER = new IO::Pager ( resume => 1 );
+		$msg .= "\nUsage: $0 [options] $required\n";
+		$msg .= "       $0 $helpcmd\n" if $helpcmd;
+		$msg .= "       $0 $versioncmd\n" if $versioncmd;
+		$msg .= "\n" unless $decfirst && $usage =~ /\A[ \t]*\n/;
 	}
-
-	unless ($self->{_internal}{source})
-	{
-		print $PAGER  "\nUsage: $0 [options] $required\n";
-		print $PAGER  "       $0 $helpcmd\n" if $helpcmd;
-		print $PAGER  "       $0 $versioncmd\n" if $versioncmd;
-		print $PAGER  "\n" unless $decfirst && $usage =~ /\A[ \t]*\n/;
-	}
-	print $PAGER  "Options:\n" unless $decfirst;
-	print $PAGER  $usage;
-
-	exit $_[1] if defined $_[1];
+	$msg .= "Options:\n" unless $decfirst;
+  $msg .= $usage;
+  return $msg;
 }
 
 sub unused {
@@ -1328,8 +1341,7 @@ Getopt::Declare - Declaratively Expressed Command-Line Arguments via Regular Exp
 
 =head1 VERSION
 
-This document describes version 1.12 of Getopt::Declare,
-released Sept 2, 2009
+This document describes version 1.13 of Getopt::Declare, released Mar 28, 2010
 
 =head1 SYNOPSIS
 
@@ -2708,6 +2720,7 @@ I<both> the C<-len> I<and> the C<-field> parameters have been used.
 Note that the operators C<&&>, C<||>, and C<!> retain their normal
 Perl precedences.
 
+=back
 
 =head2 Parsing from other sources
 

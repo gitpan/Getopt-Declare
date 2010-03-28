@@ -1,5 +1,5 @@
 ==============================================================================
-                  Release of version 1.12 of Getopt::Declare
+                  Release of version 1.13 of Getopt::Declare
 ==============================================================================
 
 
@@ -86,11 +86,11 @@ Note: requires the Text::Balanced module
 
 ==============================================================================
 
-CHANGES IN VERSION 1.12
+CHANGES IN VERSION 1.13
 
 
-	- Bug fixes for parsing decimal numbers and lists of files
-
+	- Bug fix for the use of IO::Pager
+  - Unit testing uses Test::More now
 
 ==============================================================================
 
