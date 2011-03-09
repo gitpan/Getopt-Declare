@@ -2,10 +2,9 @@ package Getopt::Declare;
 
 use strict;
 use vars qw($VERSION);
-use UNIVERSAL qw(isa);
 use Carp;
 
-$VERSION = '1.13';
+$VERSION = '1.14';
 
 sub import {
 	my ($class, $defn) = @_;
@@ -38,7 +37,7 @@ sub matcher    { '())?' }
 sub code       { '' }
 sub cachecode  { '' }
 sub trailer    { undef }
-sub ows	       { return $_[1]; }
+sub ows        { return $_[1]; }
 
 package Getopt::Declare::ScalarArg;
 
@@ -48,14 +47,14 @@ sub _reset_stdtype
 {
 	%stdtype = 
 	(
-		':i'	=> { pattern => '(?:(?:%T[+-]?)%D+)(?=\s|\0|\z)' },
-		':n'	=> { pattern => '(?:(?:%T[+-]?)(?:%D+(?:%T\.%D*)?(?:%T[eE][+-]?%D+)?|%T\.%D+(?:%T[eE][+-]?%D+)?))(?=\s|\0|\z)' },
-		':s'	=> { pattern => '(?:%T(?:\S|\0))+(?=\s|\0|\z)' },
-		':qs'	=> { pattern => q{(?:"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|(?:%T(?:\S|\0))+)(?=\s|\0|\z)} },
-		':id'	=> { pattern => '%T[a-zA-Z_](?:%T\w)*(?=\s|\0|\z)' },
-		':if'	=> { pattern => '(?:%T(?:\S|\0))+(?=\s|\0|\z)',
+		':i'	=> { pattern => '(?:(?:%T[+-]?)%D+)' },
+		':n'	=> { pattern => '(?:(?:%T[+-]?)(?:%D+(?:%T\.%D*)?(?:%T[eE][+-]?%D+)?|%T\.%D+(?:%T[eE][+-]?%D+)?))' },
+		':s'	=> { pattern => '(?:%T(?:\S|\0))+' },
+		':qs'	=> { pattern => q{(?:"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|(?:%T(?:\S|\0))+)} },
+		':id'	=> { pattern => '%T[a-zA-Z_](?:%T\w)*' },
+		':if'	=> { pattern => '(?:%T(?:\S|\0))+',
 			     action => '{reject (!defined $_VAL_ || $_VAL_ ne "-" && ! -r $_VAL_, "in parameter \'$_PARAM_\' (file \"$_VAL_\" is not readable)")}' },
-		':of'	=> { pattern => '(?:%T(?:\S|\0))+(?=\s|\0|\z)',
+		':of'	=> { pattern => '(?:%T(?:\S|\0))+',
 			     action => '{reject (!defined $_VAL_ || $_VAL_ ne "-" && -e $_VAL_ && ! -w $_VAL_ , "in parameter \'$_PARAM_\' (file \"$_VAL_\" is not writable)")}' },
 		''	=> { pattern => ':s', ind => 1 },
 		':+i'	=> { pattern => ':i',
@@ -73,18 +72,21 @@ sub _reset_stdtype
 	);
 }
 
-sub stdtype	# ($typename)
+sub stdtype  # ($typename)
 {
 	my $name = shift;
 	my %seen = ();
 	while (!$seen{$name} && $stdtype{$name} && $stdtype{$name}->{ind})
-		{ $seen{$name} = 1; $name = $stdtype{$name}->{pattern} }
+		{
+			$seen{$name} = 1;
+			$name = $stdtype{$name}->{pattern}
+		}
 
 	return undef if $seen{$name} || !$stdtype{$name};
 	return $stdtype{$name}->{pattern};
 }
 
-sub stdactions	# ($typename)
+sub stdactions  # ($typename)
 {
 	my $name = shift;
 	my %seen = ();
@@ -102,7 +104,7 @@ sub stdactions	# ($typename)
 	return @actions;
 }
 
-sub addtype 	# ($abbrev, $pattern, $action, $ref)
+sub addtype  # ($abbrev, $pattern, $action, $ref)
 {
 	my $typeid = ":$_[0]";
 	unless ($_[1] =~ /\S/) { $_[1] = ":s" , $_[3] = 1; }
@@ -113,7 +115,7 @@ sub addtype 	# ($abbrev, $pattern, $action, $ref)
 	$stdtype{$typeid}->{ind} = $_[3];
 }
 
-sub new		# ($self, $name, $type, $nows)
+sub new  # ($self, $name, $type, $nows)
 {
 	bless
 	{	name => $_[1],
@@ -122,7 +124,7 @@ sub new		# ($self, $name, $type, $nows)
 	}, ref($_[0])||$_[0];
 }
 
-sub matcher	# ($self, $trailing)
+sub matcher  # ($self, $trailing)
 {
 	my ($self, $trailing) = @_;
 
@@ -145,7 +147,7 @@ sub matcher	# ($self, $trailing)
 	return "(?:$stdtype)";
 }
 
-sub code	# ($self, $pos, $package)
+sub code  # ($self, $pos, $package)
 {
 	my $code = '
 		$_VAR_ = q|<' . $_[0]->{name} . '>|;
@@ -165,14 +167,14 @@ sub code	# ($self, $pos, $package)
 	return $code;
 }
 
-sub cachecode	# ($self, $ownerflag, $itemcount)
+sub cachecode  # ($self, $ownerflag, $itemcount)
 {
 	return "\t\t\$self->{'$_[1]'}{'<$_[0]->{name}>'} = \$$_[0]->{name};\n"
 		if $_[2] > 1;
 	return "\t\t\$self->{'$_[1]'} = \$$_[0]->{name};\n";
 }
 
-sub trailer { '' };	# MEANS TRAILING PARAMETER VARIABLE
+sub trailer { '' }; # MEANS TRAILING PARAMETER VARIABLE
 
 sub ows
 {
@@ -183,10 +185,9 @@ sub ows
 
 package Getopt::Declare::ArrayArg;
 
-use vars qw { @ISA };
-@ISA = qw ( Getopt::Declare::ScalarArg );
+use base qw( Getopt::Declare::ScalarArg );
 
-sub matcher	# ($self, $trailing)
+sub matcher  # ($self, $trailing)
 {
 	my ($self, $trailing) = @_;
 	my $suffix = (defined $trailing && !$trailing) ? '([\s\0]+)' : '';
@@ -194,7 +195,7 @@ sub matcher	# ($self, $trailing)
 	return $scalar.'(?:[\s\0]+'.$scalar.')*'.$suffix;
 }
 
-sub code	# ($self, $pos, $package)
+sub code  # ($self, $pos, $package)
 {
 	my $code = '
 		$_VAR_ = q|<' . $_[0]->{name} . '>|;
@@ -218,7 +219,7 @@ sub code	# ($self, $pos, $package)
 	return $code;
 }
 
-sub cachecode	# ($self, $ownerflag, $itemcount)
+sub cachecode  # ($self, $ownerflag, $itemcount)
 {
 	return "\t\t\$self->{'$_[1]'}{'<$_[0]->{name}>'} = []
 			unless \$self->{'$_[1]'}{'<$_[0]->{name}>'};
@@ -232,18 +233,18 @@ sub cachecode	# ($self, $ownerflag, $itemcount)
 
 package Getopt::Declare::Punctuator;
 
-sub new		# ($self, $text, $nows)
+sub new  # ($self, $text, $nows)
 {
 	bless { text => $_[1], nows => $_[2] }
 }
 
-sub matcher	# ($self, $trailing)
+sub matcher  # ($self, $trailing)
 {
 	#WAS: Getopt::Declare::Arg::negflagpat() . '\Q' . $_[0]->{text} . '\E';
 	Getopt::Declare::Arg::negflagpat() . quotemeta($_[0]->{text});
 }
 
-sub code	# ($self, $pos)
+sub code  # ($self, $pos)
 {
 	"
 		\$_PUNCT_{'" . $_[0]->{text} . "'" . '} = $' . ($_[1]+1) . ";\n";
@@ -278,7 +279,7 @@ sub besthelp { foreach ( @helpcmd ) { return $_ if exists $helpcmd{$_}; } }
 sub helppat  { return join '|', keys %helpcmd; }
 
 my @versioncmd = qw( -version --version -Version --Version
-		     -VERSION --VERSION -v -V );
+                     -VERSION --VERSION -v -V );
 my %versioncmd = map { $_ => 1 } @versioncmd;
 
 sub bestversion {foreach (@versioncmd) { return $_ if exists $versioncmd{$_}; }}
@@ -301,7 +302,7 @@ sub posflagpat
 	return $posflagpat;
 }
 
-sub new		# ($class, $spec, $desc, $dittoflag)
+sub new  # ($class, $spec, $desc, $dittoflag)
 {
 	my ($class,$spec,$desc,$ditto) = @_;
 	my $first = 1;
@@ -328,20 +329,19 @@ sub new		# ($class, $spec, $desc, $dittoflag)
 
 	while ($spec)
 	{
-	# OPTIONAL
+		# OPTIONAL
 		if ($spec =~ s/\A(\s*)\[/$1/)
 		{
-			push @{$self->{args}}, new Getopt::Declare::StartOpt;
+			push @{$self->{args}}, Getopt::Declare::StartOpt->new;
 			next;
 		}
 		elsif ($spec =~ s/\A\s*\]//)
 		{
-			push @{$self->{args}}, new Getopt::Declare::EndOpt;
+			push @{$self->{args}}, Getopt::Declare::EndOpt->new;
 			next;
 		}
 
-	# ARG
-
+		# ARG
 		($arg,$spec,$nows) = extract_bracketed($spec,'<>');
 		if ($arg)
 		{
@@ -350,22 +350,21 @@ sub new		# ($class, $spec, $desc, $dittoflag)
 
 			my @details = ( $3, $4, !$first && !length($nows) );  # NAME,TYPE,NOWS
 
-			if ($spec =~ s/\A\.\.\.//)	# ARRAY ARG
+			if ($spec =~ s/\A\.\.\.//)  # ARRAY ARG
 			{
 				push @{$self->{args}},
-					new Getopt::Declare::ArrayArg (@details);
+					Getopt::Declare::ArrayArg->new(@details);
 			}
-			else	# SCALAR ARG
+			else  # SCALAR ARG
 			{
 				push @{$self->{args}},
-					new Getopt::Declare::ScalarArg (@details);
+					Getopt::Declare::ScalarArg->new(@details);
 			}
 			$self->{items}++;
 			next;
 		}
 
-	# PUNCTUATION
-
+		# PUNCTUATION
 		elsif ( $spec =~ s/\A(\s*)((\\.|[^] \t\n[<])+)// )
 		{
 			my ($ows, $punct) = ($1,$2);
@@ -378,7 +377,7 @@ sub new		# ($class, $spec, $desc, $dittoflag)
 			}
 
 			else	    { push @{$self->{args}},
-					new Getopt::Declare::Punctuator ($punct,!length($ows));
+					Getopt::Declare::Punctuator->new($punct,!length($ows));
 				      $self->{items}++; }
 
 		}
@@ -567,18 +566,15 @@ sub _quoteat
 	$text;
 }
 
-sub new		# ($self, $grammar; $source)
+sub new  # ($self, $grammar; $source)
 {
-# HANDLE SHORT-CIRCUITS
-
+	# HANDLE SHORT-CIRCUITS
 	return 0 if @_==3 && (!defined($_[2]) || $_[2] eq '-SKIP'); 
 
-# SET-UP
-
+	# SET-UP
 	my ($_class, $_grammar) = @_;
 
-# PREDEFINED GRAMMAR?
-
+	# PREDEFINED GRAMMAR?
 	if ($_grammar =~ /\A(-[A-Z]+)+/)
 	{
 		my $predef = $_grammar;
@@ -588,16 +584,13 @@ sub new		# ($self, $grammar; $source)
 		return undef if $predef || !$_grammar;
 	}
 
-# PRESERVE ESCAPED '['s
-
+	# PRESERVE ESCAPED '['s (opening bracket only)
 	$_grammar =~ s/\\\[/\255/g;
 
-# MAKE SURE GRAMMAR ENDS WITH A NEWLINE
-
+	# MAKE SURE GRAMMAR ENDS WITH A NEWLINE
 	$_grammar =~ s/([^\n])\Z/$1\n/;
 
-# SET-UP
-
+	# SET-UP
 	local $_ = $_grammar;
 	my @_args = ();
 	my $_mutex = {};
@@ -608,15 +601,13 @@ sub new		# ($self, $grammar; $source)
 	_nocase(0);
 	Getopt::Declare::ScalarArg::_reset_stdtype();
 
-# CONSTRUCT GRAMMAR
-	
+	# CONSTRUCT GRAMMAR
 	while (length $_ > 0)
 	{
-	# COMMENT:
+		# COMMENT:
 		s/\A[ 	]*#.*\n// and next;
 
-	# TYPE DIRECTIVE:
-
+		# TYPE DIRECTIVE:
 		s{\A(\s*\[\s*pvtype:\s*\S+\s+)/}{$1 qr/};
 		if (m/\A\s*\[\s*pvtype:/ and $_action = extract_codeblock($_,'[]'))
 		{
@@ -625,7 +616,7 @@ sub new		# ($self, $grammar; $source)
 			next;
 		}
 
-	# ACTION
+		# ACTION
 		if ($_action = extract_codeblock)
 		{
 			# WAS: eval q{no strict;my $ref = sub }._quoteat($_action).q{;1}
@@ -649,7 +640,7 @@ sub new		# ($self, $grammar; $source)
 			    . "\t(did you forget a closing '}'?)\n";
 		}
 
-	# ARG + DESC:
+		# ARG + DESC:
 		if ( s/\A(.*?\S.*?)(\t.*\n)// )
 		{
 			my $spec = $1;
@@ -663,7 +654,7 @@ sub new		# ($self, $grammar; $source)
 				  and $ditto = 1;
 			$_lastdesc = $desc;
 
-			my $arg = new Getopt::Declare::Arg($spec,$desc,$ditto) ;
+			my $arg = Getopt::Declare::Arg->new($spec,$desc,$ditto) ;
 			push @_args, $arg;
 
 			_infer($desc, $arg, $_mutex);
@@ -671,8 +662,7 @@ sub new		# ($self, $grammar; $source)
 		}
 
 
-	# OTHERWISE: DECORATION
-
+		# OTHERWISE: DECORATION
 		s/((?:(?!\[\s*pvtype:).)*)(\n|(?=\[\s*pvtype:))//;
 		my $decorator = $1;
 		$_strict ||= $decorator =~ /\Q[strict]/;
@@ -699,8 +689,7 @@ sub new		# ($self, $grammar; $source)
 
 	} @_args;
 
-# CONSTRUCT OBJECT ITSELF
-
+	# CONSTRUCT OBJECT ITSELF
 	my $clump = ($_grammar =~ /\[\s*cluster:\s*none\s*\]/i)     ? 0
 		  : ($_grammar =~ /\[\s*cluster:\s*singles?\s*\]/i) ? 1
 		  : ($_grammar =~ /\[\s*cluster:\s*flags?\s*\]/i)   ? 2
@@ -727,15 +716,13 @@ sub new		# ($self, $grammar; $source)
 	}, ref($_class)||$_class;
 
 
-# VESTIGAL DEBUGGING CODE
-
+	# VESTIGAL DEBUGGING CODE
 	open (CODE, ">.CODE")
 		and print CODE $self->code($self->{_internal}{'caller'})
 		and close CODE
 			if $::Declare_debug;
 
-# DO THE PARSE (IF APPROPRIATE)
-
+	# DO THE PARSE (IF APPROPRIATE)
 	if (@_==3) { return undef unless defined $self->parse($_[2]) }
 	else	   { return undef unless defined $self->parse(); }
 
@@ -744,7 +731,7 @@ sub new		# ($self, $grammar; $source)
 
 sub _get_nextline { scalar <> }
 
-sub _load_sources	# ( \$_get_nextline, @files )
+sub _load_sources  # ( \$_get_nextline, @files )
 {
 	my $text  = '';
 	my @found = ();
@@ -769,7 +756,7 @@ sub _load_sources	# ( \$_get_nextline, @files )
 }
 
 
-sub parse	# ($self;$source)
+sub parse  # ($self;$source)
 {
 	my ( $self, $source ) = @_;
 	my $_args = ();
@@ -780,13 +767,13 @@ sub parse	# ($self;$source)
 		{
 			return 0;
 		}
-		elsif (isa($source,'CODE'))
+		elsif ( ref $source eq 'CODE' )
 		{
 			$_get_nextline = $source;
 			$_args = &{$_get_nextline}($self);
 			$source = '[SUB]';
 		}
-		elsif (isa($source,'GLOB'))
+		elsif ( ref $source eq 'GLOB' )
 		{
 			if (-t *$source)
 			{
@@ -801,7 +788,7 @@ sub parse	# ($self;$source)
 				$source = ref($source);
 			}
 		}
-		elsif (isa($source,'IO::Handle'))
+		elsif ( ref $source eq 'IO::Handle' )
 		{
 			if (!($source->fileno) && -t)
 			{
@@ -816,7 +803,7 @@ sub parse	# ($self;$source)
 				$source = ref($source);
 			}
 		}
-		elsif (ref($source) eq 'ARRAY')
+		elsif ( ref $source eq 'ARRAY' )
 		{
 			if (@$source == 1 && (!defined($source->[0])
 					      || $source->[0] eq '-BUILD'
@@ -851,7 +838,7 @@ sub parse	# ($self;$source)
 		return 0 unless defined $_args;
 		$source = " (in $source)";
 	}
-	else # $source was NOT provided
+	else  # $source was NOT provided
 	{
 		foreach (@ARGV) {
 			# Clean entries: remove spaces, tabs and newlines
@@ -862,18 +849,17 @@ sub parse	# ($self;$source)
 	}
 
 	$self->{_internal}{source} = $source;
-	
+
 	if (!eval $self->code($self->{_internal}{'caller'}))
 	{
-		die "Error: in generated parser code:\n$@\n"
-			if $@;
+		die "Error: in generated parser code:\n$@\n" if $@;
 		return undef;
 	}
 
 	return 1;
 }
 
-sub type # ($abbrev, $pattern, $action)
+sub type  # ($abbrev, $pattern, $action)
 {
 	&Getopt::Declare::ScalarArg::addtype;
 }
@@ -947,8 +933,8 @@ sub _typedef
 	do { $desc =~ s/\A\s*(:?)\s*([^] \t\n]+)//
 		and $pat = $2 and $ind = $1 } unless $pat;
 	$pat = '' unless $pat;
-
 	$action = extract_codeblock($desc) || '';
+
 	die "Error: bad type directive (expected closing ']' but found"
 	    . "'$1' instead): [pvtype: $name " . ($pat?"/$pat/":'')
 	    . " $action $1$2....\n" if $desc =~ /\A\s*([^] \t\n])(\S*)/;
@@ -956,7 +942,7 @@ sub _typedef
 	Getopt::Declare::ScalarArg::addtype($name,$pat,$action,$ind=~/:/);
 }
 
-sub _ditto	# ($originalflag, $orginaldesc, $extra)
+sub _ditto  # ($originalflag, $orginaldesc, $extra)
 {
 	my ($originalflag, $originaldesc, $extra) = @_;
 	if ($originaldesc =~ /\n.*\n/)
@@ -973,7 +959,7 @@ sub _ditto	# ($originalflag, $orginaldesc, $extra)
 	return "$originaldesc$extra\n";
 }
 
-sub _mutex	# (\%mutex, @list)
+sub _mutex  # (\%mutex, @list)
 {
 	my ($mref, @mutexlist) = @_;
 
@@ -988,7 +974,7 @@ sub _mutex	# (\%mutex, @list)
 	}
 }
 
-sub _exclude	# (\%mutex, $excluded, @list)
+sub _exclude  # (\%mutex, $excluded, @list)
 {
 	my ($mref, $excluded, @mutexlist) = @_;
 
@@ -1011,21 +997,27 @@ sub version
 	if ($::VERSION) { print "\n\t$0: version $::VERSION  ($filedate)\n\n" }
 	else { print "\n\t$0: version dated $filedate\n\n" }
 	exit $exit_status if defined $exit_status;
-  return 1;
+	return 1;
 }
 
 sub usage
 {
 	my ($self, $exit_status) = @_;
-	if (eval { require IO::Pager })
+
+        my $use_pager = eval { require IO::Pager };
+
+	if ($use_pager)
 	{
 		new IO::Pager; # use a pager for all print() statements
 	}
+
 	print $self->usage_string;
-	if (eval { require IO::Pager })
+
+	if ($use_pager)
 	{
 		close; # done using the pager
 	}
+
 	if (defined $exit_status)
 	{
 		exit $exit_status;
@@ -1036,8 +1028,9 @@ sub usage
 sub usage_string
 {
 	my $self = shift;
+
 	local $_ = $self->{_internal}{usage};
-	
+
 	my $lastflag = undef;
 	my $lastdesc = undef;
 
@@ -1048,23 +1041,26 @@ sub usage_string
 
 	while (length $_ > 0)
 	{
-	# COMMENT:
+
+		# COMMENT:
 		s/\A[ 	]*#.*\n// and next;
 
-	# TYPE DIRECTIVE:
-
-		if (m/\A\s*\[\s*pvtype:/ and extract_codeblock($_,'[{}]'))
+		# TYPE DIRECTIVE:
+		#WAS: if (m/\A\s*\[\s*pvtype:/ and extract_codeblock($_,'[{}]'))
+		if (m/\A\s*\[\s*pvtype:/ and extract_bracketed($_,'[{}]'))
 		{
 			next;
 		}
 
-	# ACTION
-		extract_codeblock
-			and do { s/\A[ 	]*\n//;
-				 $decfirst = 0 unless defined $decfirst;
-				 next; };
+		# ACTION
+		#WAS: extract_codeblock and do {
+		extract_bracketed($_,'[{}]') and do {
+			s/\A[ 	]*\n//;
+			$decfirst = 0 unless defined $decfirst;
+			next;
+		};
 
-	# ARG + DESC:
+		# ARG + DESC:
 		if ( s/\A(.*?\S.*?\t+)(.*?\n)// )
 		{
 			$decfirst = 0 unless defined $decfirst;
@@ -1075,10 +1071,12 @@ sub usage_string
 			$desc .= (expand $1)[0]
 				while s/\A((?![ 	]*({|\n)|.*?\S.*?\t.*?\S).*?\S.*\n)//;
 
+			# Skip parameters with the special directive [undocumented]
 			next if $desc =~ /\[\s*undocumented\s*\]/i;
 
 			$uoff = 0;
 			$spec =~ s/(<[a-zA-Z]\w*):([^>]+)>/$uoff+=1+length $2 and "$1>"/ge;
+
 			$ditto = $desc =~ /\A\s*\[\s*ditto\s*\]/;
 			$desc =~ s/^\s*\[.*?\]\s*\n//gm;
 			$desc =~ s/\[.*?\]//g;
@@ -1086,6 +1084,7 @@ sub usage_string
 			if ($ditto)
 				{ $desc = ($lastdesc? _ditto($lastflag,$lastdesc,$desc) : "" ) }
 			elsif ($desc =~ /\A\s*\Z/)
+				# Skip parameters with no description
 				{ next; }
 			else
 				{ $lastdesc = $desc; }
@@ -1096,7 +1095,7 @@ sub usage_string
 			next;
 		};
 
-	# OTHERWISE, DECORATION
+		# OTHERWISE, DECORATION
 		if (s/((?:(?!\[\s*pvtype:).)*)(\n|(?=\[\s*pvtype:))//)
 		{
 			my $desc = $1.($2||'');
@@ -1105,7 +1104,11 @@ sub usage_string
 			$decfirst = 1 unless defined $decfirst
 						or $desc =~ m/\A\s*\Z/;
 			$usage .= $desc;
+			next;
 		}
+
+		# Should never get here if all goes well
+		die "Error: internal error\n";
 	}
 
 	my $required = '';
@@ -1118,15 +1121,16 @@ sub usage_string
 		}
 	}
 
-	$usage =~ s/\255/[/g;	# REINSTATE ESCAPED '['s
+	# REINSTATE ESCAPED '['s
+	$usage =~ s/\255/[/g;  
 
 	$required =~ s/<([a-zA-Z]\w*):[^>]+>/<$1>/g;
 
 	my $helpcmd = Getopt::Declare::Arg::besthelp;
 	my $versioncmd = Getopt::Declare::Arg::bestversion;
 
-  my $msg = '';
-  unless ($self->{_internal}{source})
+	my $msg = '';
+	unless ($self->{_internal}{source})
 	{
 		$msg .= "\nUsage: $0 [options] $required\n";
 		$msg .= "       $0 $helpcmd\n" if $helpcmd;
@@ -1134,8 +1138,8 @@ sub usage_string
 		$msg .= "\n" unless $decfirst && $usage =~ /\A[ \t]*\n/;
 	}
 	$msg .= "Options:\n" unless $decfirst;
-  $msg .= $usage;
-  return $msg;
+	$msg .= $usage;
+	return $msg;
 }
 
 sub unused {
@@ -1341,7 +1345,7 @@ Getopt::Declare - Declaratively Expressed Command-Line Arguments via Regular Exp
 
 =head1 VERSION
 
-This document describes version 1.13 of Getopt::Declare, released Mar 28, 2010
+This document describes version 1.14 of Getopt::Declare
 
 =head1 SYNOPSIS
 
@@ -2242,8 +2246,7 @@ which contains the name of the parameter currently being matched.
 
 Here is a example of the use of these variables:
 
-        $args = new Getopt::Declare <<'EOPARAM';
-
+	$specs = q{
         [pvtype: type  /[OAB]|AB')/                                     ]
         [pvtype: Rh?   /Rh[+-]/                                         ]
         [pvtype: days  :+i  { reject $_VAL_<14 " $_PARAM_ (too soon!)"} ]
@@ -2253,7 +2256,8 @@ Here is a example of the use of these variables:
 
           -blood <type:type> [<rh:Rh?>]   Specify blood type
                                           and (optionally) rhesus factor
-        EOPARAM
+        };
+        $args = Getopt::Declare->new($specs);
 
 In the above example, the ":days" parameter variable type is defined
 to match whatever the ":+i" type matches (that is positive, non-zero
@@ -2268,7 +2272,7 @@ issue the following (respective) error messages:
 Note that the "inbuilt" parameter variable types ("i", "n", etc.) are
 really just predefined type names, and hence can be altered if necessary:
 
-        $args = new Getopt::Declare <<'EOPARAM';
+        $args = Getopt::Declare->new(<<'EOPARAM');
 
         [pvtype: 'n' /[MDCLXVI]+/ { reject !($_VAL_=to_roman $_VAL_) } ]
 
@@ -2477,7 +2481,7 @@ This version of the directive turns off clustering completely.
 
 For example:
 
-        $args = new Getopt::Declare <<'EOSPEC';
+        $args = Getopt::Declare->new(<<'EOSPEC');
                 -a              Append mode
                 -b              Back-up mode
                 -bu             [ditto]
@@ -2521,7 +2525,7 @@ However, if a new F<Getopt::Declare> object is created with a
 specification string containing the C<[strict]> directive (at any
 point in the specification):
 
-        $args = new Getopt::Declare <<'EOSPEC';
+        $args = Getopt::Declare->new(<<'EOSPEC');
 
                 [strict]
 
@@ -2758,8 +2762,7 @@ L<"The Getopt::Declare::parse() method">.
 in which case C<Getopt::Declare::new()> immediately returns zero.
 This alternative is useful when using a C<FileHandle>:
 
-        my $args = new Getopt::Declare($grammar,
-                                       new FileHandle ($filename) || -SKIP);
+        my $args = Getopt::Declare->new($grammar, new FileHandle ($filename) || -SKIP);
 
 because it makes explicit what happens if C<FileHandle::new()> fails. Of course,
 if the C<-SKIP> alternative were omitted, <Getopt::Declare::new> would
@@ -2811,12 +2814,12 @@ corresponding hash key is not a hash reference, but the actual value matched.
 
 The following example illustrates the various possibilities:
 
-        $args = new Getopt::Declare q{
+        $args = Getopt::Declare->new( q{
 
                 -v <value> [etc]        One or more values
                 <infile>                Input file [required]
                 -o <outfiles>...        Output files
-        };
+        } );
 
         if ( $args->{'-v'} )
         {
@@ -2842,14 +2845,14 @@ actions. In particular, if the value of any of those block-scoped variables
 is changed within an action, that changed value is saved in the hash. For
 example, given the specification:
 
-        $args = new Getopt::Declare q{
+        $args = Getopt::Declare->new( q{
 
         -ar <R:n>       Set aspect ratio (will be clipped to [0..1])
                                 {
                                   $R = 0 if $R < 0;
                                   $R = 1 if $R > 1;
                                 }
-        };
+        } );
 
 then the value of C<$args-E<gt>{'-ar'}{'E<lt>RE<gt>'}>
 will always be between zero and one.
@@ -2914,8 +2917,8 @@ Thus, the following code first constructs a parser for a series of alternate
 configuration files and the command line, and then parses them:
 
         # BUILD PARSERS
-        my $config  = Getopt::Declare::new($config_grammar, -BUILD);
-        my $cmdline = Getopt::Declare::new($cmdline_grammar, -BUILD);
+        my $config  = Getopt::Declare->new($config_grammar, -BUILD);
+        my $cmdline = Getopt::Declare->new($cmdline_grammar, -BUILD);
 
         # TRY STANDARD CONFIG FILES
         $config->parse(-CONFIG)
@@ -2933,7 +2936,7 @@ configuration files and the command line, and then parses them:
 
 =item The C<Getopt::Declare::code()> method
 
-It is also possible to retreive the command-line parsing code generated
+It is also possible to retrieve the command-line parsing code generated
 internally by C<Getopt::Declare::new()>. The C<Getopt::Declare::code()>
 method returns a string containing the complete command-line processing
 code, as a single C<do> block plus a leading C<package> declaration.
@@ -2955,7 +2958,7 @@ Getopt::Declare" and the next "=cut" appearing on C<STDIN>:
 
         use Getopt::Declare;
 
-        sub encode { return new Getopt::Declare (shift,-BUILD)->code() || die }
+        sub encode { return Getopt::Declare->new(shift,-BUILD)->code() || die }
 
         undef $/;
         if (<>)
@@ -2993,13 +2996,13 @@ the help parameter (see L<"Help parameters">) or by explicitly calling
 the C<Getopt::Declare::usage()> method (through an action or after
 command-line processing):
 
-        $args = new Getopt::Declare q{
+        $args = Getopt::Declare->new( q{
 
                 -usage          Show usage information and exit
                                         { $self->usage(0); }
 
                 +usage          Show usage information at end of program
-        };
+        } );
 
         # PROGRAM HERE 
 
@@ -3055,7 +3058,9 @@ when asked for usage information.
 Any line which cannot be interpreted as either a parameter
 definition, a parameter description, or a parameter action, is treated
 as a "decorator" line, and is printed verbatim (after any square
-bracketted substrings have been removed from it).
+bracketted substrings have been removed from it). If your decoration needs
+square brackets, you need to escape the opening square bracket with a
+backslash, e.g. C<\[decoration]>.
 
 The key to successfully decorating F<Getopt::Declare> usage
 information is to ensure that decorator lines are separated from
@@ -3067,10 +3072,10 @@ specification).
 
 The following specification demonstrates various forms of usage
 decoration. In fact, there are only four actual parameters (C<-in>,
-C<-r>, C<-p>, and C<-out>) specified. Note in particular that I<leading> tabs
-are perfectly acceptible in decorator lines.
+C<-r>, C<-p>, and C<-out>) specified. Note in particular that I<leading>
+tabs are perfectly acceptible in decorator lines.
 
-        $args = new Getopt::Declare (<<'EOPARAM');
+        $args = Getopt::Declare->new(<<'EOPARAM');
 
         ============================================================
         Required parameter:
@@ -3130,7 +3135,7 @@ would still be accessible through the other seven alternatives).
 =head2 Version parameters
 
 F<Getopt::Declare> also automatically creates a set of parameters which can be
-used to retreive program version information:
+used to retrieve program version information:
 
         -version        Show version information [undocumented]
                                 { $self->version(0); }
@@ -3245,7 +3250,7 @@ argument was not a positive number.
 
 =head1 AUTHOR
 
-Damian Conway (damian@conway.org)
+Damian Conway <damian@conway.org>
 
 
 =head1 BUGS AND ANNOYANCES
@@ -3255,7 +3260,8 @@ There are undoubtedly serious bugs lurking somewhere in this code.
 If nothing else, it shouldn't take 1500 lines to explain a
 package that was designed for intuitive ease of use!
 
-Bug reports and other feedback are most welcome.
+Bug reports and other feedback are most welcome at:
+https://rt.cpan.org/Public/Bug/Report.html?Queue=Getopt-Declare
 
 
 =head1 COPYRIGHT

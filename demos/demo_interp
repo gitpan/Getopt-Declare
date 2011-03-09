@@ -1,9 +1,12 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/env perl
 
+use strict;
+use warnings;
 use Getopt::Declare;
+
 use vars qw{ $name $result $n };
 
-my $interpolator = new Getopt::Declare (<<'EOCMDS',[-BUILD]);
+my $interpolator = Getopt::Declare->new(<<'EOCMDS',[-BUILD]);
 	[cluster:none]
 	[repeatable]
 	[pvtype: NOTDELIM /(?:%T.)+/ ]

@@ -5,7 +5,11 @@ demos/demo_interp
 demos/demo_shell
 lib/Getopt/Declare.pm
 Makefile.PL
-MANIFEST
+MANIFEST			This list of files
+META.yml
 README
-t/test.t
-META.yml                                 Module meta-data (added by MakeMaker)
+t/00-load.t
+t/01-parse-args.t
+t/02-infinite-loop.t
+t/03-optional-spaces.t
+t/04-build-parser.t

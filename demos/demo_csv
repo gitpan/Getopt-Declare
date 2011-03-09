@@ -1,16 +1,15 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/env perl
 
-
+use strict;
+use warnings;
+no warnings qw(once);
 use Getopt::Declare;
 
-my $args = new Getopt::Declare <<EOARGS;
+my $args = Getopt::Declare->new(<<EOARGS);
 	-f <filename:if>	Parse file <filename>
 EOARGS
 
-@students = ();
-@absent = ();
-
-$data = q{
+my $data = q{
 	absmith,1234567,20
 	"aesmith, the other one",7635656,DNS
 	cat,dog,22.2
@@ -20,35 +19,41 @@ $data = q{
 	vtthan,872829,94
 };
 
-my $csv = <<'EOCSV';
-	<name:qs> , <id:+i> , <score:0+n>	STD FORMAT [repeatable]
+my $csv_spec = <<'EOCSV';
+	<name:qs> , <id:+i> , <score:0+n>	STD FORMAT
+		[repeatable]
 		{ push @::students, {name=>$name, id=>$id, score=>$score} }
-
-	<id:+i> , <name:qs> , <score:0+n>	VARIANT FORMAT [repeatable]
+	
+	<id:+i> , <name:qs> , <score:0+n>	VARIANT FORMAT
+		[repeatable]
 		{ push @::students, {name=>$name, id=>$id, score=>$score} }
-
-	<name:qs> , <id:+i> , DNS		DID NOT SIT [repeatable]
+	
+	<name:qs> , <id:+i> , DNS		DID NOT SIT
+		[repeatable]
 		{ push @::absent, {name=>$name, id=>$id, score=>0} }
-
-	<other:/.+/>				SOMETHING ELSE [repeatable]
+	
+	<other:/.+/>				SOMETHING ELSE
+		[repeatable]
 		{ print "Unknown entry format: [$other]\n"; }
 EOCSV
 
+
 if ($args->{"-f"})
 {
-	my $args = new Getopt::Declare ($csv,[$args->{"-f"}]);
+	$args = Getopt::Declare->new($csv_spec,[$args->{"-f"}]);
 }
 else
 {
-	my $args = new Getopt::Declare ($csv,$data);
+	$args = Getopt::Declare->new($csv_spec,$data);
 }
 
-foreach ( @students )
+print "\nList of students:\n";
+foreach ( @::students )
 {
-	print "$_->{id} ($_->{name}):	$_->{score}\n";
+	print "   ".$_->{id}." (".$_->{name}."):	".$_->{score}."\n";
 }
 
-foreach ( @absent )
+foreach ( @::absent )
 {
-	print "$_->{id} ($_->{name}):	ABSENT\n";
+	print "   ".$_->{id}." (".$_->{name}."):	ABSENT\n";
 }

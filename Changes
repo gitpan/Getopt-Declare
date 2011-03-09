@@ -139,5 +139,20 @@ Revision history for Perl extension Getopt::Declare.
 
 	- Fixed the support for IO::Pager
 
-  - Improved unit testing with Test::More
+	- Improved unit testing with Test::More
+
+1.14	Tue Mar 09 2011
+
+	- Fixed bug #66220 (reported by Dominic Hargreaves): now using ref()
+	  instead of the deprecated function UNIVERSAL::isa()
+
+	- Fixed bug #65510 (reported by Suresh Govindachar): optional whitespaces
+          in arguments specifications like '-e <f:i> .. <t:i>' are optional again
+
+	- Fixed infinite loop occurring with very particular command-line specs
+
+	- Updated demo scripts
+
+	- Misc maintenance of the POD, unit tests and main code
+
 
